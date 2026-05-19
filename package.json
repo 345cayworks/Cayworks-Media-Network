@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && prisma migrate deploy && next build",
+    "postbuild": "tsx prisma/seed.ts || echo 'seed skipped (non-fatal)'",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",

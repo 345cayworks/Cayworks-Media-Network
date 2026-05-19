@@ -7,18 +7,18 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
- * One-time, key-protected seed endpoint so the DB can be populated without
- * local CLI access. Requires the SUPERADMIN_MASTER_KEY (sent as
- * X-Bootstrap-Key header or ?key=). Idempotent — existing platform API keys
- * are never regenerated. Tables must already exist (migrations run on deploy).
+ * Key-protected seed endpoint so the DB can be populated without local CLI
+ * access. Key via X-Bootstrap-Key header or ?key= (GET allowed so it can be
+ * triggered from a browser). Idempotent — existing platform API keys are
+ * never regenerated. Tables must already exist (migrations run on deploy).
  */
-export async function POST(req: Request) {
+async function handle(req: Request) {
   const master = process.env.SUPERADMIN_MASTER_KEY ?? "";
   const email = process.env.SUPER_ADMIN_EMAIL ?? "admin@cayworks.example";
 
   if (master.length < 8) {
     return NextResponse.json(
-      { ok: false, error: "SUPERADMIN_MASTER_KEY is not configured" },
+      { ok: false, error: "SUPERADMIN_MASTER_KEY is not configured (min 8 chars)" },
       { status: 503 },
     );
   }
@@ -27,7 +27,10 @@ export async function POST(req: Request) {
   const provided =
     req.headers.get("x-bootstrap-key") ?? url.searchParams.get("key") ?? "";
   if (provided !== master) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    return NextResponse.json(
+      { ok: false, error: "Forbidden — key does not match SUPERADMIN_MASTER_KEY" },
+      { status: 403 },
+    );
   }
 
   try {
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       superadminEmail: result.superadminEmail,
-      // Raw keys are returned only for platforms created on THIS call.
+      loginWith: `${result.superadminEmail} / <your SUPERADMIN_MASTER_KEY>`,
       newPlatformKeys: result.newPlatformKeys,
       log: result.log,
       note: "Save any newPlatformKeys now — they are not retrievable again.",
@@ -44,11 +47,13 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error:
-          err instanceof Error ? err.message.slice(0, 300) : "Seed failed",
-        hint: "If the error mentions a missing table, redeploy so migrations run, then retry.",
+        error: err instanceof Error ? err.message.slice(0, 300) : "Seed failed",
+        hint: "If it mentions a missing table, redeploy so migrations run, then retry.",
       },
       { status: 500 },
     );
   }
 }
+
+export const GET = handle;
+export const POST = handle;

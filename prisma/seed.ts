@@ -13,7 +13,9 @@ async function main() {
   for (const [slug, key] of Object.entries(result.newPlatformKeys)) {
     console.log(`\n  ${slug} API KEY (save this — shown once): ${key}`);
   }
-  console.log(`\nSuperadmin login: ${result.superadminEmail} / ${password}`);
+  console.log(
+    `\nSuperadmin ready: ${result.superadminEmail} (password = SUPERADMIN_MASTER_KEY)`,
+  );
   console.log("Seed complete.");
 }
 
