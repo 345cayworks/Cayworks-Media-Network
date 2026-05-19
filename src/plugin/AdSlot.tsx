@@ -25,6 +25,11 @@ export type AdSlotProps = {
   category?: string;
   variant?: AdVariant;
   className?: string;
+  /**
+   * When true, logs the fetch lifecycle to the console and renders a visible
+   * placeholder when no ad is available — useful while wiring up a new app.
+   */
+  debug?: boolean;
 };
 
 function pickVariant(v: AdVariant | undefined, ad: AdPayload): Exclude<AdVariant, "auto"> {
@@ -46,11 +51,25 @@ export function AdSlot(props: AdSlotProps) {
 
   useEffect(() => {
     let active = true;
+    if (props.debug) {
+      // eslint-disable-next-line no-console
+      console.log("[AdSlot] fetching", {
+        engineUrl,
+        platform,
+        placement,
+        userRole,
+        category,
+        keyPreview: apiKey ? `${apiKey.slice(0, 10)}…` : "(empty)",
+      });
+    }
     fetchAd(cfg, { placement, userRole, category }).then((result) => {
-      if (active) {
-        setAd(result);
-        setReady(true);
+      if (!active) return;
+      if (props.debug) {
+        // eslint-disable-next-line no-console
+        console.log("[AdSlot] result", result ?? "(no ad)");
       }
+      setAd(result);
+      setReady(true);
     });
     return () => {
       active = false;
@@ -87,7 +106,27 @@ export function AdSlot(props: AdSlotProps) {
   }
 
   // Graceful fallback: render nothing if no ad is available.
-  if (!ready || !ad) return null;
+  if (!ready || !ad) {
+    if (props.debug && ready) {
+      return (
+        <div
+          style={{
+            border: "1px dashed #cbd5e1",
+            color: "#64748b",
+            padding: 10,
+            borderRadius: 8,
+            fontSize: 12,
+            fontFamily: "system-ui, sans-serif",
+          }}
+        >
+          AdSlot debug — no ad served for {platform}/{placement}. Check{" "}
+          <code>/api/ads/diagnose?platform={platform}&placement={placement}</code>
+          .
+        </div>
+      );
+    }
+    return null;
+  }
 
   const variant = pickVariant(props.variant, ad);
 
