@@ -24,9 +24,25 @@ with an API key and requests ads for named placements.
 cp .env.example .env          # then edit values
 npm install
 npm run db:push               # create schema in your Postgres
-npm run db:seed               # superadmin + CayRentManager + sample data
+npm run db:seed               # superadmin + platforms + sample data
 npm run dev                   # http://localhost:3000
 ```
+
+### Deploying without local CLI access
+
+`npm run build` runs `prisma migrate deploy`, so **migrations apply
+automatically on every Netlify deploy** (set `DATABASE_URL` in the site
+env so it's present at build time).
+
+To seed without the CLI, POST to the key-protected bootstrap endpoint once
+after the deploy is live:
+
+```bash
+curl -X POST "https://your-site/api/bootstrap" -H "X-Bootstrap-Key: $SUPERADMIN_MASTER_KEY"
+```
+
+It is idempotent and returns the API keys for any newly created platforms
+(save them — shown once). `GET /api/health` reports config/DB status.
 
 `npm run db:seed` is idempotent and bakes in three platforms —
 **CayRentManager**, **ASI Cayman Portal** (`asicayman`) and **Clarity
