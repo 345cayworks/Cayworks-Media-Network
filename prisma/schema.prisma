@@ -1,0 +1,359 @@
+// Cayworks Ad Engine — data model
+// Provider is PostgreSQL: required for native enums + scalar list (String[]) support
+// and for serverless/Netlify deployment (SQLite cannot persist on Functions).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SUPERADMIN
+  AD_ADMIN
+  SALES_REP
+  ADVERTISER
+  PLATFORM_OWNER
+  REPORT_VIEWER
+}
+
+enum AdvertiserStatus {
+  ACTIVE
+  INACTIVE
+  PROSPECT
+}
+
+enum BillingStatus {
+  CURRENT
+  PAST_DUE
+  ON_HOLD
+}
+
+enum PlatformStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PlacementStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PlacementType {
+  BANNER
+  SIDEBAR
+  CARD
+  NATIVE
+  VIDEO
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum PricingModel {
+  CPM
+  CPC
+  FLAT
+  HOUSE
+}
+
+enum CampaignObjective {
+  AWARENESS
+  TRAFFIC
+  LEADS
+  CONVERSIONS
+}
+
+enum CreativeType {
+  IMAGE
+  VIDEO
+  NATIVE
+  HTML
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CreativeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CampaignPlacementStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum DeviceType {
+  DESKTOP
+  MOBILE
+  TABLET
+  UNKNOWN
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(REPORT_VIEWER)
+  // Optional linkage so an ADVERTISER user can see only their own data.
+  advertiserId String?
+  advertiser   Advertiser? @relation(fields: [advertiserId], references: [id], onDelete: SetNull)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actorEmail String
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Core advertising models
+// ---------------------------------------------------------------------------
+
+model Advertiser {
+  id            String           @id @default(cuid())
+  businessName  String
+  contactName   String
+  email         String
+  phone         String?
+  website       String?
+  industry      String?
+  billingStatus BillingStatus    @default(CURRENT)
+  status        AdvertiserStatus @default(ACTIVE)
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  campaigns Campaign[]
+  invoices  Invoice[]
+  users     User[]
+
+  @@index([status])
+}
+
+model Platform {
+  id             String         @id @default(cuid())
+  name           String
+  slug           String         @unique
+  apiKeyHash     String
+  apiKeyPrefix   String         @default("")
+  status         PlatformStatus @default(ACTIVE)
+  allowedDomains String[]       @default([])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  placements  AdPlacement[]
+  impressions AdImpression[]
+  clicks      AdClick[]
+  conversions AdConversion[]
+
+  @@index([status])
+}
+
+model AdPlacement {
+  id            String          @id @default(cuid())
+  platformId    String
+  platform      Platform        @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  placementKey  String
+  name          String
+  description   String?
+  allowedSizes  String[]        @default([])
+  placementType PlacementType   @default(BANNER)
+  status        PlacementStatus @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  campaignPlacements CampaignPlacement[]
+  impressions        AdImpression[]
+  clicks             AdClick[]
+  conversions        AdConversion[]
+
+  @@unique([platformId, placementKey])
+  @@index([status])
+}
+
+model Campaign {
+  id                   String            @id @default(cuid())
+  advertiserId         String
+  advertiser           Advertiser        @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  name                 String
+  objective            CampaignObjective @default(TRAFFIC)
+  startDate            DateTime
+  endDate              DateTime
+  budget               Decimal           @default(0) @db.Decimal(12, 2)
+  pricingModel         PricingModel      @default(CPM)
+  status               CampaignStatus    @default(DRAFT)
+  priority             Int               @default(5)
+  dailyImpressionLimit Int?
+  totalImpressionLimit Int?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  creatives          Creative[]
+  campaignPlacements CampaignPlacement[]
+  impressions        AdImpression[]
+  clicks             AdClick[]
+  conversions        AdConversion[]
+  invoices           Invoice[]
+
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model Creative {
+  id             String         @id @default(cuid())
+  campaignId     String
+  campaign       Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  imageUrl       String?
+  videoUrl       String?
+  destinationUrl String
+  ctaText        String?
+  creativeType   CreativeType   @default(IMAGE)
+  width          Int?
+  height         Int?
+  approvalStatus ApprovalStatus @default(PENDING)
+  status         CreativeStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  impressions AdImpression[]
+  clicks      AdClick[]
+  conversions AdConversion[]
+
+  @@index([approvalStatus])
+}
+
+model CampaignPlacement {
+  id          String                  @id @default(cuid())
+  campaignId  String
+  campaign    Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  placementId String
+  placement   AdPlacement             @relation(fields: [placementId], references: [id], onDelete: Cascade)
+  status      CampaignPlacementStatus @default(ACTIVE)
+  weight      Int                     @default(1)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@unique([campaignId, placementId])
+}
+
+model AdImpression {
+  id              String     @id @default(cuid())
+  campaignId      String
+  campaign        Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creativeId      String
+  creative        Creative   @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  placementId     String
+  placement       AdPlacement @relation(fields: [placementId], references: [id], onDelete: Cascade)
+  platformId      String
+  platform        Platform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  anonymousUserId String?
+  userRole        String?
+  pageUrl         String?
+  deviceType      DeviceType @default(UNKNOWN)
+  ipHash          String?
+  userAgent       String?
+  createdAt       DateTime   @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([placementId, createdAt])
+  @@index([platformId, createdAt])
+}
+
+model AdClick {
+  id              String     @id @default(cuid())
+  campaignId      String
+  campaign        Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creativeId      String
+  creative        Creative   @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  placementId     String
+  placement       AdPlacement @relation(fields: [placementId], references: [id], onDelete: Cascade)
+  platformId      String
+  platform        Platform   @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  anonymousUserId String?
+  destinationUrl  String
+  createdAt       DateTime   @default(now())
+
+  @@index([campaignId, createdAt])
+}
+
+model AdConversion {
+  id             String      @id @default(cuid())
+  campaignId     String
+  campaign       Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creativeId     String?
+  creative       Creative?   @relation(fields: [creativeId], references: [id], onDelete: SetNull)
+  placementId    String?
+  placement      AdPlacement? @relation(fields: [placementId], references: [id], onDelete: SetNull)
+  platformId     String?
+  platform       Platform?   @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  conversionType String
+  value          Decimal     @default(0) @db.Decimal(12, 2)
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+
+  @@index([campaignId, createdAt])
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  advertiserId     String
+  advertiser       Advertiser    @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
+  campaignId       String?
+  campaign         Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  amount           Decimal       @default(0) @db.Decimal(12, 2)
+  status           InvoiceStatus @default(DRAFT)
+  dueDate          DateTime
+  paidAt           DateTime?
+  paymentReference String?
+  // Reserved for Phase 4 Fygaro payment-link integration.
+  fygaroLinkUrl    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([status])
+}

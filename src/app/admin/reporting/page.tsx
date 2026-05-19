@@ -1,0 +1,137 @@
+import Link from "next/link";
+import { requireRole, REPORT_ROLES } from "@/lib/auth";
+import { buildReport, type DateRange } from "@/lib/reporting";
+import { PageHeader, EmptyState } from "@/components/ui";
+
+export const dynamic = "force-dynamic";
+
+const TABS = [
+  { key: "campaign", label: "By Campaign" },
+  { key: "platform", label: "By Platform" },
+  { key: "placement", label: "By Placement" },
+] as const;
+
+export default async function ReportingPage({
+  searchParams,
+}: {
+  searchParams: { groupBy?: string; from?: string; to?: string };
+}) {
+  await requireRole(REPORT_ROLES);
+
+  const dim = (TABS.find((t) => t.key === searchParams.groupBy)?.key ??
+    "campaign") as "campaign" | "platform" | "placement";
+
+  const range: DateRange = {};
+  if (searchParams.from && !Number.isNaN(Date.parse(searchParams.from)))
+    range.from = new Date(searchParams.from);
+  if (searchParams.to && !Number.isNaN(Date.parse(searchParams.to)))
+    range.to = new Date(searchParams.to);
+
+  const rows = await buildReport(dim, range);
+
+  const qs = new URLSearchParams();
+  qs.set("groupBy", dim);
+  if (searchParams.from) qs.set("from", searchParams.from);
+  if (searchParams.to) qs.set("to", searchParams.to);
+  const csvHref = `/api/ads/reporting?${qs.toString()}&format=csv`;
+
+  return (
+    <div>
+      <PageHeader
+        title="Reporting"
+        subtitle="Impressions, clicks, CTR and conversions."
+        action={
+          <a className="btn-primary" href={csvHref}>
+            Export CSV
+          </a>
+        }
+      />
+
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
+          {TABS.map((t) => {
+            const p = new URLSearchParams(searchParams as Record<string, string>);
+            p.set("groupBy", t.key);
+            return (
+              <Link
+                key={t.key}
+                href={`/admin/reporting?${p.toString()}`}
+                className={
+                  t.key === dim
+                    ? "rounded-md bg-brand-500 px-3 py-1.5 text-sm font-medium text-white"
+                    : "rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
+                }
+              >
+                {t.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        <form className="flex flex-wrap items-end gap-2" method="get">
+          <input type="hidden" name="groupBy" value={dim} />
+          <div>
+            <label className="label" htmlFor="from">
+              From
+            </label>
+            <input
+              id="from"
+              name="from"
+              type="date"
+              defaultValue={searchParams.from}
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="to">
+              To
+            </label>
+            <input
+              id="to"
+              name="to"
+              type="date"
+              defaultValue={searchParams.to}
+              className="input"
+            />
+          </div>
+          <button type="submit" className="btn-secondary">
+            Apply
+          </button>
+        </form>
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState message="No data for the selected range." />
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-200">
+                <th className="th">{TABS.find((t) => t.key === dim)?.label}</th>
+                <th className="th text-right">Impressions</th>
+                <th className="th text-right">Clicks</th>
+                <th className="th text-right">CTR</th>
+                <th className="th text-right">Conversions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key} className="border-b border-slate-50">
+                  <td className="td font-medium">{r.label}</td>
+                  <td className="td text-right">
+                    {r.impressions.toLocaleString()}
+                  </td>
+                  <td className="td text-right">
+                    {r.clicks.toLocaleString()}
+                  </td>
+                  <td className="td text-right">{r.ctr.toFixed(2)}%</td>
+                  <td className="td text-right">{r.conversions}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
