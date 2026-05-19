@@ -45,7 +45,7 @@ rejected at `/api/ads/serve`, so its ads stop serving network-wide.
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AUTH_SECRET` | Long random string; signs admin session JWTs + hashes IPs |
 | `NEXT_PUBLIC_AD_ENGINE_URL` | Public base URL (used in snippets) |
-| `SEED_SUPERADMIN_EMAIL` / `SEED_SUPERADMIN_PASSWORD` | Seed bootstrap admin |
+| `SUPER_ADMIN_EMAIL` / `SUPERADMIN_MASTER_KEY` | Bootstrap master superadmin account |
 
 ## Roles
 

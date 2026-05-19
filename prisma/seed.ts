@@ -88,8 +88,8 @@ async function seedPlatform(p: SeedablePlatform) {
 }
 
 async function main() {
-  const email = (process.env.SEED_SUPERADMIN_EMAIL ?? "admin@cayworks.example").toLowerCase();
-  const password = process.env.SEED_SUPERADMIN_PASSWORD ?? "ChangeMe123!";
+  const email = (process.env.SUPER_ADMIN_EMAIL ?? "admin@cayworks.example").toLowerCase();
+  const password = process.env.SUPERADMIN_MASTER_KEY ?? "ChangeMe123!";
 
   const passwordHash = await bcrypt.hash(password, 10);
   await prisma.user.upsert({
