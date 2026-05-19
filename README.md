@@ -147,6 +147,16 @@ daily/total impression caps or with on-hold billing → optional category
 bias (advertiser industry) → weighted-random pick by
 `campaign.priority × campaignPlacement.weight` → one approved+active creative.
 
+## Creative media
+
+- **Images:** paste a URL or upload directly. Direct upload uses Cloudinary
+  unsigned upload (set `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` +
+  `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`); the delivery URL is stored, so the
+  backend stays stateless/serverless-friendly.
+- **Video:** paste a **YouTube** link (rendered as a privacy-friendly embed)
+  or a direct/Cloudinary `.mp4` (HTML5 player), or upload a file. Video ads
+  render the player plus a tracked CTA button. Plugin preset: `<VideoAd>`.
+
 ## Security
 
 - API keys hashed (SHA-256); raw key revealed exactly once via short-lived

@@ -16,6 +16,41 @@ export type AdPayload = {
   label: string;
 };
 
+export type ResolvedVideo =
+  | { type: "youtube"; embedSrc: string }
+  | { type: "file"; src: string };
+
+export function resolveVideo(
+  videoUrl: string | null | undefined,
+): ResolvedVideo | null {
+  if (!videoUrl) return null;
+  try {
+    const u = new URL(videoUrl.trim());
+    const host = u.hostname.replace(/^www\./, "");
+    let id: string | null = null;
+    if (host === "youtu.be") id = u.pathname.slice(1) || null;
+    else if (host.endsWith("youtube.com")) {
+      if (u.pathname === "/watch") id = u.searchParams.get("v");
+      else {
+        const m = u.pathname.match(/^\/(embed|shorts|v)\/([^/?]+)/);
+        if (m) id = m[2] ?? null;
+      }
+    }
+    if (id) {
+      return {
+        type: "youtube",
+        embedSrc: `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`,
+      };
+    }
+    if (u.protocol === "http:" || u.protocol === "https:") {
+      return { type: "file", src: u.toString() };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export type AdEngineConfig = {
   engineUrl: string;
   apiKey: string;

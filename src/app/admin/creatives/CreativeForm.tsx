@@ -1,5 +1,6 @@
 import type { Creative, Campaign } from "@prisma/client";
 import { Field, TextArea, Select, FormError, enumOptions } from "@/components/form";
+import { MediaUpload } from "@/components/MediaUpload";
 
 export function CreativeForm({
   action,
@@ -36,17 +37,18 @@ export function CreativeForm({
         defaultValue={creative?.description}
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Image URL"
+        <MediaUpload
+          label="Image"
           name="imageUrl"
+          kind="image"
           defaultValue={creative?.imageUrl}
-          placeholder="https://cdn.example.com/ad.png"
         />
-        <Field
-          label="Video URL"
+        <MediaUpload
+          label="Video"
           name="videoUrl"
+          kind="video"
           defaultValue={creative?.videoUrl}
-          placeholder="https://cdn.example.com/ad.mp4"
+          hint="YouTube link (rendered as embed) or a direct/Cloudinary .mp4"
         />
         <Field
           label="Destination URL"

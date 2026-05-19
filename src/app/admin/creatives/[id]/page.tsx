@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, getSessionUser, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, Badge, LinkButton } from "@/components/ui";
 import { setApproval } from "../actions";
+import { resolveVideo } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function CreativeDetailPage({
     },
   });
   if (!cr) notFound();
+  const video = resolveVideo(cr.videoUrl);
 
   return (
     <div>
@@ -76,9 +78,18 @@ export default async function CreativeDetailPage({
                 className="mb-2 max-h-48 w-full rounded object-cover"
               />
             )}
-            {cr.videoUrl && (
+            {video?.type === "youtube" && (
+              <iframe
+                src={video.embedSrc}
+                title={cr.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="mb-2 aspect-video w-full rounded"
+              />
+            )}
+            {video?.type === "file" && (
               <video
-                src={cr.videoUrl}
+                src={video.src}
                 controls
                 className="mb-2 max-h-48 w-full rounded"
               />

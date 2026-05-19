@@ -18,3 +18,8 @@ export function SponsoredCard(props: PresetProps) {
 export function NativeAd(props: PresetProps) {
   return <AdSlot {...props} variant="native" />;
 }
+
+/** Video unit — YouTube link renders as an embed, otherwise an HTML5 player. */
+export function VideoAd(props: PresetProps) {
+  return <AdSlot {...props} variant="video" />;
+}

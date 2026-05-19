@@ -5,11 +5,12 @@ import {
   fetchAd,
   recordImpression,
   recordClick,
+  resolveVideo,
   type AdPayload,
   type AdEngineConfig,
 } from "./client";
 
-export type AdVariant = "banner" | "card" | "native" | "auto";
+export type AdVariant = "banner" | "card" | "native" | "video" | "auto";
 
 export type AdSlotProps = {
   /** Base URL of the Cayworks Ad Engine deployment. */
@@ -28,6 +29,7 @@ export type AdSlotProps = {
 
 function pickVariant(v: AdVariant | undefined, ad: AdPayload): Exclude<AdVariant, "auto"> {
   if (v && v !== "auto") return v;
+  if (ad.videoUrl && resolveVideo(ad.videoUrl)) return "video";
   if (ad.creativeType === "NATIVE") return "native";
   if (ad.creativeType === "IMAGE" && ad.imageUrl) return "banner";
   return "card";
@@ -88,6 +90,20 @@ export function AdSlot(props: AdSlotProps) {
   if (!ready || !ad) return null;
 
   const variant = pickVariant(props.variant, ad);
+
+  // Video isn't wrapped in the anchor: an iframe/video would swallow the
+  // click. It renders the player plus a tracked CTA button instead.
+  if (variant === "video") {
+    return (
+      <div
+        ref={containerRef}
+        className={props.className}
+        data-cae-placement={placement}
+      >
+        <VideoAd ad={ad} onCta={(e) => onClick(e)} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -225,6 +241,78 @@ function NativeAdView({ ad }: { ad: AdPayload }) {
           {ad.ctaText} →
         </span>
       )}
+    </div>
+  );
+}
+
+function VideoAd({
+  ad,
+  onCta,
+}: {
+  ad: AdPayload;
+  onCta: (e: React.MouseEvent) => void;
+}) {
+  const video = resolveVideo(ad.videoUrl);
+  return (
+    <div
+      style={{
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        overflow: "hidden",
+        background: "#fff",
+      }}
+    >
+      <div style={{ ...LABEL_STYLE, padding: "8px 12px 0" }}>{ad.label}</div>
+      <div style={{ padding: "8px 12px" }}>
+        {video?.type === "youtube" && (
+          <iframe
+            src={video.embedSrc}
+            title={ad.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{
+              width: "100%",
+              aspectRatio: "16 / 9",
+              border: 0,
+              borderRadius: 6,
+            }}
+          />
+        )}
+        {video?.type === "file" && (
+          <video
+            src={video.src}
+            controls
+            playsInline
+            style={{ width: "100%", borderRadius: 6 }}
+          />
+        )}
+      </div>
+      <div style={{ padding: "0 12px 12px" }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{ad.title}</div>
+        {ad.description && (
+          <div style={{ fontSize: 13, color: "#475569", marginTop: 2 }}>
+            {ad.description}
+          </div>
+        )}
+        <a
+          href={ad.destinationUrl}
+          onClick={onCta}
+          rel="noopener noreferrer sponsored"
+          style={{
+            display: "inline-block",
+            marginTop: 10,
+            padding: "8px 14px",
+            borderRadius: 6,
+            background: "#1f6feb",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: "none",
+          }}
+        >
+          {ad.ctaText ?? "Learn more"}
+        </a>
+      </div>
     </div>
   );
 }
