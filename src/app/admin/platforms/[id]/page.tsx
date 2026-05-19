@@ -7,7 +7,7 @@ import {
   createPlacement,
   setPlacementStatus,
 } from "../actions";
-import { readAndClearNewKey } from "@/lib/platform-key-flash";
+import { readNewKey } from "@/lib/platform-key-flash";
 import { Field, TextArea, Select, enumOptions } from "@/components/form";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function PlatformDetailPage({
   });
   if (!p) notFound();
 
-  const newKey = readAndClearNewKey(p.id);
+  const newKey = readNewKey(p.id);
   const base =
     process.env.NEXT_PUBLIC_AD_ENGINE_URL ?? "http://localhost:3000";
 
