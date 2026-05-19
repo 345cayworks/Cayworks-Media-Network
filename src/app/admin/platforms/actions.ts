@@ -65,6 +65,20 @@ export async function regenerateApiKey(id: string) {
   redirect(`/admin/platforms/${id}`);
 }
 
+export async function setPlatformStatus(
+  id: string,
+  status: "ACTIVE" | "INACTIVE",
+) {
+  const user = await requireRole(ADMIN_ROLES);
+  await prisma.platform.update({ where: { id }, data: { status } });
+  await audit(user, `PLATFORM_${status}`, "Platform", id);
+  // An INACTIVE platform's API key is rejected at /api/ads/serve, so this
+  // instantly switches that platform's ads off network-wide.
+  revalidatePath("/admin");
+  revalidatePath("/admin/platforms");
+  revalidatePath(`/admin/platforms/${id}`);
+}
+
 export async function createPlacement(platformId: string, formData: FormData) {
   const user = await requireRole(ADMIN_ROLES);
   const raw = { ...Object.fromEntries(formData), platformId };

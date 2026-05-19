@@ -1,13 +1,21 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireUser, getSessionUser, ADMIN_ROLES } from "@/lib/auth";
 import { dashboardStats } from "@/lib/reporting";
+import { prisma } from "@/lib/prisma";
 import { Stat, PageHeader, Badge, EmptyState } from "@/components/ui";
+import { setPlatformStatus } from "./platforms/actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   await requireUser();
+  const sessionUser = await getSessionUser();
+  const canToggle = !!sessionUser && ADMIN_ROLES.includes(sessionUser.role);
   const s = await dashboardStats({});
+  const platforms = await prisma.platform.findMany({
+    orderBy: { name: "asc" },
+    include: { _count: { select: { placements: true } } },
+  });
 
   return (
     <div>
@@ -33,6 +41,61 @@ export default async function DashboardPage() {
           hint="Awaiting approval"
         />
         <Stat label="Expiring (14d)" value={s.expiring.length} />
+      </div>
+
+      <div className="mt-8 card">
+        <div className="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
+          Connected Platforms
+        </div>
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="th">Platform</th>
+              <th className="th">Slug</th>
+              <th className="th">Placements</th>
+              <th className="th">Status</th>
+              {canToggle && <th className="th text-right">Serving</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {platforms.map((p) => {
+              const next = p.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+              return (
+                <tr key={p.id} className="border-b border-slate-50">
+                  <td className="td font-medium">
+                    <Link
+                      href={`/admin/platforms/${p.id}`}
+                      className="text-brand-600 hover:underline"
+                    >
+                      {p.name}
+                    </Link>
+                  </td>
+                  <td className="td font-mono text-xs">{p.slug}</td>
+                  <td className="td">{p._count.placements}</td>
+                  <td className="td">
+                    <Badge value={p.status} />
+                  </td>
+                  {canToggle && (
+                    <td className="td text-right">
+                      <form action={setPlatformStatus.bind(null, p.id, next)}>
+                        <button
+                          type="submit"
+                          className={
+                            p.status === "ACTIVE"
+                              ? "btn-danger"
+                              : "btn-primary"
+                          }
+                        >
+                          {p.status === "ACTIVE" ? "Turn off" : "Turn on"}
+                        </button>
+                      </form>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       <div className="mt-8 card">

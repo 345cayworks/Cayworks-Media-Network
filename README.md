@@ -28,8 +28,15 @@ npm run db:seed               # superadmin + CayRentManager + sample data
 npm run dev                   # http://localhost:3000
 ```
 
-`npm run db:seed` prints the bootstrap superadmin credentials and the
-**CayRentManager API key** (shown once). Sign in at `/login`.
+`npm run db:seed` is idempotent and bakes in three platforms —
+**CayRentManager**, **ASI Cayman Portal** (`asicayman`) and **Clarity
+Finance** (`clarityfinance`) — with default placements and sample
+campaigns. It prints the bootstrap superadmin credentials and each
+platform's API key (shown once). Sign in at `/login`.
+
+Each platform can be switched on/off instantly from the **dashboard** or
+the Platforms page (no redeploy) — an INACTIVE platform's API key is
+rejected at `/api/ads/serve`, so its ads stop serving network-wide.
 
 ### Environment variables
 

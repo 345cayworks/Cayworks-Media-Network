@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
+import { setPlatformStatus } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +32,13 @@ export default async function PlatformsPage() {
                 <th className="th">API Key</th>
                 <th className="th">Placements</th>
                 <th className="th">Status</th>
+                <th className="th">Serving</th>
               </tr>
             </thead>
             <tbody>
-              {platforms.map((p) => (
+              {platforms.map((p) => {
+                const next = p.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+                return (
                 <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50">
                   <td className="td font-medium">
                     <Link
@@ -52,8 +56,21 @@ export default async function PlatformsPage() {
                   <td className="td">
                     <Badge value={p.status} />
                   </td>
+                  <td className="td">
+                    <form action={setPlatformStatus.bind(null, p.id, next)}>
+                      <button
+                        type="submit"
+                        className={
+                          p.status === "ACTIVE" ? "btn-danger" : "btn-primary"
+                        }
+                      >
+                        {p.status === "ACTIVE" ? "Turn off" : "Turn on"}
+                      </button>
+                    </form>
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
