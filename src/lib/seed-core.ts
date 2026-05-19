@@ -203,5 +203,111 @@ export async function runSeed(
     }
   }
   log.push(`${ADVERTISERS.length} sample advertisers + campaigns + creatives`);
+
+  // ---- Delivery test: one image + one video creative, high priority,
+  // assigned to EVERY placement on EVERY platform so ad delivery can be
+  // verified immediately on any placement. Idempotent.
+  const demoAdv = await prisma.advertiser.upsert({
+    where: { id: "seed_delivery_test" },
+    create: {
+      id: "seed_delivery_test",
+      businessName: "Cayworks Ad Engine — Delivery Test",
+      contactName: "Cayworks",
+      email: "adengine@cayworks.example",
+      industry: "real estate",
+      status: "ACTIVE",
+      billingStatus: "CURRENT",
+    },
+    update: {},
+  });
+
+  const now = new Date();
+  const demoCampaign = await prisma.campaign.upsert({
+    where: { id: "seedcamp_delivery_test" },
+    create: {
+      id: "seedcamp_delivery_test",
+      advertiserId: demoAdv.id,
+      name: "Delivery Test (image + video)",
+      objective: "AWARENESS",
+      startDate: new Date(now.getTime() - 86400000),
+      endDate: new Date(now.getTime() + 365 * 86400000),
+      budget: 0,
+      pricingModel: "HOUSE",
+      status: "ACTIVE",
+      priority: 10,
+    },
+    update: {
+      status: "ACTIVE",
+      priority: 10,
+      endDate: new Date(now.getTime() + 365 * 86400000),
+    },
+  });
+
+  await prisma.creative.upsert({
+    where: { id: "seedcr_test_image" },
+    create: {
+      id: "seedcr_test_image",
+      campaignId: demoCampaign.id,
+      title: "Sample Image Ad",
+      description: "Delivery test — static image creative.",
+      imageUrl:
+        "https://placehold.co/728x180/1f6feb/ffffff/png?text=Cayworks+Sample+Ad",
+      destinationUrl: "https://www.cayworks.example",
+      ctaText: "Learn more",
+      creativeType: "IMAGE",
+      width: 728,
+      height: 180,
+      approvalStatus: "APPROVED",
+      status: "ACTIVE",
+    },
+    update: { approvalStatus: "APPROVED", status: "ACTIVE" },
+  });
+
+  await prisma.creative.upsert({
+    where: { id: "seedcr_test_video" },
+    create: {
+      id: "seedcr_test_video",
+      campaignId: demoCampaign.id,
+      title: "Sample Video Ad",
+      description: "Delivery test — YouTube video creative.",
+      videoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      destinationUrl: "https://www.cayworks.example",
+      ctaText: "Watch & learn more",
+      creativeType: "VIDEO",
+      approvalStatus: "APPROVED",
+      status: "ACTIVE",
+    },
+    update: { approvalStatus: "APPROVED", status: "ACTIVE" },
+  });
+
+  let links = 0;
+  for (const platform of platforms) {
+    const placements = await prisma.adPlacement.findMany({
+      where: { platformId: platform.id },
+      select: { id: true },
+    });
+    for (const pl of placements) {
+      await prisma.campaignPlacement.upsert({
+        where: {
+          campaignId_placementId: {
+            campaignId: demoCampaign.id,
+            placementId: pl.id,
+          },
+        },
+        create: {
+          campaignId: demoCampaign.id,
+          placementId: pl.id,
+          status: "ACTIVE",
+          weight: 5,
+        },
+        update: { status: "ACTIVE", weight: 5 },
+      });
+      links++;
+    }
+  }
+  log.push(
+    `Delivery-test campaign (sample image + sample video) on ${links} placements`,
+  );
+
   return { superadminEmail: email, newPlatformKeys, log };
 }
