@@ -29,6 +29,22 @@ export type AdSlotProps = {
   variant?: AdVariant;
   className?: string;
   /**
+   * How the creative fills its box when an aspect ratio / height is set.
+   * "cover" fills and crops (no distortion, default), "contain" letterboxes,
+   * "fill" stretches to fit exactly (may distort).
+   */
+  fit?: "cover" | "contain" | "fill";
+  /**
+   * Aspect ratio for image/video creatives, e.g. "16/9" or "728/90". When
+   * omitted, the creative's own width/height are used; failing that the image
+   * keeps its natural ratio. Lets the slot scale fluidly with no layout shift.
+   */
+  aspectRatio?: string;
+  /** Fixed pixel/CSS height for the media box (overrides aspectRatio). */
+  height?: number | string;
+  /** Cap the slot width; otherwise it fills 100% of its container. */
+  maxWidth?: number | string;
+  /**
    * Enable timed rotation. When set (> 0), the slot fetches a weighted
    * rotation queue and cycles through it every `rotateSeconds` seconds.
    * Heavier-weight campaigns appear proportionally more often.
@@ -209,6 +225,17 @@ export function AdSlot(props: AdSlotProps) {
 
   const variant = pickVariant(props.variant, current);
 
+  const sizing: Sizing = {
+    fit: props.fit ?? "cover",
+    aspectRatio: props.aspectRatio,
+    height: props.height,
+  };
+  // Fluid by default: fill the host container, capped by maxWidth if given.
+  const wrapperStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: props.maxWidth,
+  };
+
   // Video isn't wrapped in the anchor: an iframe/video would swallow the
   // click. It renders the player plus a tracked CTA button instead.
   if (variant === "video") {
@@ -216,9 +243,10 @@ export function AdSlot(props: AdSlotProps) {
       <div
         ref={containerRef}
         className={props.className}
+        style={wrapperStyle}
         data-cae-placement={placement}
       >
-        <VideoAd ad={current} onCta={(e) => onClick(e)} />
+        <VideoAd ad={current} sizing={sizing} onCta={(e) => onClick(e)} />
       </div>
     );
   }
@@ -227,6 +255,7 @@ export function AdSlot(props: AdSlotProps) {
     <div
       ref={containerRef}
       className={props.className}
+      style={wrapperStyle}
       data-cae-placement={placement}
     >
       <a
@@ -235,12 +264,46 @@ export function AdSlot(props: AdSlotProps) {
         rel="noopener noreferrer sponsored"
         style={{ textDecoration: "none", color: "inherit", display: "block" }}
       >
-        {variant === "banner" && <BannerAd ad={current} />}
-        {variant === "card" && <CardAd ad={current} />}
+        {variant === "banner" && <BannerAd ad={current} sizing={sizing} />}
+        {variant === "card" && <CardAd ad={current} sizing={sizing} />}
         {variant === "native" && <NativeAdView ad={current} />}
       </a>
     </div>
   );
+}
+
+type Sizing = {
+  fit: "cover" | "contain" | "fill";
+  aspectRatio?: string;
+  height?: number | string;
+};
+
+/** Resolve the media box + image styles for a creative given sizing rules. */
+function mediaStyles(
+  ad: AdPayload,
+  sizing: Sizing,
+): { box: React.CSSProperties; img: React.CSSProperties } {
+  const ratio =
+    sizing.aspectRatio ??
+    (ad.width && ad.height ? `${ad.width} / ${ad.height}` : undefined);
+
+  if (sizing.height != null) {
+    return {
+      box: { width: "100%", height: sizing.height },
+      img: { width: "100%", height: "100%", objectFit: sizing.fit, display: "block" },
+    };
+  }
+  if (ratio) {
+    return {
+      box: { width: "100%", aspectRatio: ratio },
+      img: { width: "100%", height: "100%", objectFit: sizing.fit, display: "block" },
+    };
+  }
+  // No ratio info: scale fluidly to width, natural height.
+  return {
+    box: { width: "100%" },
+    img: { width: "100%", height: "auto", display: "block" },
+  };
 }
 
 const LABEL_STYLE: React.CSSProperties = {
@@ -251,7 +314,8 @@ const LABEL_STYLE: React.CSSProperties = {
   marginBottom: 4,
 };
 
-function BannerAd({ ad }: { ad: AdPayload }) {
+function BannerAd({ ad, sizing }: { ad: AdPayload; sizing: Sizing }) {
+  const m = mediaStyles(ad, sizing);
   return (
     <div
       style={{
@@ -259,16 +323,15 @@ function BannerAd({ ad }: { ad: AdPayload }) {
         borderRadius: 10,
         overflow: "hidden",
         background: "#fff",
+        width: "100%",
       }}
     >
       <div style={{ ...LABEL_STYLE, padding: "8px 12px 0" }}>{ad.label}</div>
       {ad.imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={ad.imageUrl}
-          alt={ad.title}
-          style={{ width: "100%", display: "block" }}
-        />
+        <div style={m.box}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={ad.imageUrl} alt={ad.title} style={m.img} />
+        </div>
       )}
       <div style={{ padding: "10px 12px" }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{ad.title}</div>
@@ -282,7 +345,7 @@ function BannerAd({ ad }: { ad: AdPayload }) {
   );
 }
 
-function CardAd({ ad }: { ad: AdPayload }) {
+function CardAd({ ad, sizing }: { ad: AdPayload; sizing: Sizing }) {
   return (
     <div
       style={{
@@ -292,6 +355,7 @@ function CardAd({ ad }: { ad: AdPayload }) {
         background: "#fff",
         display: "flex",
         gap: 12,
+        width: "100%",
       }}
     >
       {ad.imageUrl && (
@@ -300,11 +364,13 @@ function CardAd({ ad }: { ad: AdPayload }) {
           src={ad.imageUrl}
           alt={ad.title}
           style={{
-            width: 64,
-            height: 64,
-            objectFit: "cover",
+            // Thumbnail scales a little with the card width, stays square.
+            width: "clamp(56px, 22%, 96px)",
+            aspectRatio: "1 / 1",
+            objectFit: sizing.fit === "contain" ? "contain" : "cover",
             borderRadius: 8,
             flexShrink: 0,
+            alignSelf: "flex-start",
           }}
         />
       )}
@@ -365,12 +431,17 @@ function NativeAdView({ ad }: { ad: AdPayload }) {
 
 function VideoAd({
   ad,
+  sizing,
   onCta,
 }: {
   ad: AdPayload;
+  sizing: Sizing;
   onCta: (e: React.MouseEvent) => void;
 }) {
   const video = resolveVideo(ad.videoUrl);
+  // Video defaults to 16/9 (overridable); fills its width responsively.
+  const ratio = sizing.aspectRatio ?? "16 / 9";
+  const boxRatio = sizing.height != null ? undefined : ratio;
   return (
     <div
       style={{
@@ -378,6 +449,7 @@ function VideoAd({
         borderRadius: 10,
         overflow: "hidden",
         background: "#fff",
+        width: "100%",
       }}
     >
       <div style={{ ...LABEL_STYLE, padding: "8px 12px 0" }}>{ad.label}</div>
@@ -390,9 +462,11 @@ function VideoAd({
             allowFullScreen
             style={{
               width: "100%",
-              aspectRatio: "16 / 9",
+              height: sizing.height ?? undefined,
+              aspectRatio: boxRatio,
               border: 0,
               borderRadius: 6,
+              display: "block",
             }}
           />
         )}
@@ -401,7 +475,14 @@ function VideoAd({
             src={video.src}
             controls
             playsInline
-            style={{ width: "100%", borderRadius: 6 }}
+            style={{
+              width: "100%",
+              height: sizing.height ?? undefined,
+              aspectRatio: boxRatio,
+              objectFit: sizing.fit,
+              borderRadius: 6,
+              display: "block",
+            }}
           />
         )}
       </div>

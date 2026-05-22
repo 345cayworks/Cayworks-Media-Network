@@ -140,6 +140,33 @@ curl "https://ads.cayworks.com/api/ads/serve?platform=cayrentmanager&placement=l
   -H "X-Ad-Engine-Key: cae_live_..."
 ```
 
+### Responsive sizing
+
+Slots are **fluid by default** — the wrapper fills 100% of its container, so
+ads scale with the screen. Control the shape with optional props:
+
+```tsx
+{/* fills the column, keeps a 728x90-ish banner shape on every width */}
+<AdBanner {...ad} placement="..." aspectRatio="728/90" fit="cover" />
+
+{/* cap the width and letterbox instead of crop */}
+<AdBanner {...ad} placement="..." maxWidth={970} fit="contain" />
+
+{/* fixed height, stretch the image to fill exactly */}
+<AdSlot {...ad} placement="..." height={120} fit="fill" />
+```
+
+- `aspectRatio` (e.g. `"16/9"`, `"728/90"`) — reserves the box and avoids
+  layout shift; defaults to the creative's stored width/height, then to the
+  image's natural ratio.
+- `fit` — `"cover"` (fill + crop, default), `"contain"` (letterbox), `"fill"`
+  (stretch to fit exactly).
+- `height` — fixed CSS height (overrides `aspectRatio`).
+- `maxWidth` — cap the slot; otherwise it expands to the container.
+
+Video defaults to 16/9 and also fills its width. The card thumbnail scales
+with the card and stays square.
+
 ### Timed rotation
 
 Add `rotateSeconds` to any slot to cycle multiple ads on a timer:
