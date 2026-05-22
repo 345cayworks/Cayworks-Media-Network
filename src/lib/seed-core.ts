@@ -157,7 +157,7 @@ export async function runSeed(
         status: "ACTIVE",
         priority: 5,
       },
-      update: { status: "ACTIVE", endDate: end },
+      update: {},
     });
 
     await prisma.creative.upsert({
@@ -176,7 +176,7 @@ export async function runSeed(
         approvalStatus: "APPROVED",
         status: "ACTIVE",
       },
-      update: { approvalStatus: "APPROVED" },
+      update: {},
     });
 
     for (const platform of platforms) {
@@ -198,7 +198,7 @@ export async function runSeed(
           status: "ACTIVE",
           weight: 1,
         },
-        update: { status: "ACTIVE" },
+        update: {},
       });
     }
   }
@@ -236,11 +236,8 @@ export async function runSeed(
       status: "ACTIVE",
       priority: 10,
     },
-    update: {
-      status: "ACTIVE",
-      priority: 10,
-      endDate: new Date(now.getTime() + 365 * 86400000),
-    },
+    // Create-only: never override admin-managed state on re-seed/redeploy.
+    update: {},
   });
 
   await prisma.creative.upsert({
@@ -260,7 +257,7 @@ export async function runSeed(
       approvalStatus: "APPROVED",
       status: "ACTIVE",
     },
-    update: { approvalStatus: "APPROVED", status: "ACTIVE" },
+    update: {},
   });
 
   await prisma.creative.upsert({
@@ -277,7 +274,7 @@ export async function runSeed(
       approvalStatus: "APPROVED",
       status: "ACTIVE",
     },
-    update: { approvalStatus: "APPROVED", status: "ACTIVE" },
+    update: {},
   });
 
   let links = 0;
@@ -300,7 +297,7 @@ export async function runSeed(
           status: "ACTIVE",
           weight: 5,
         },
-        update: { status: "ACTIVE", weight: 5 },
+        update: {},
       });
       links++;
     }
