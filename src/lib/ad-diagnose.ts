@@ -33,6 +33,7 @@ export async function diagnoseForPlatform(
   platformSlug: string,
   platformId: string,
   placementKey: string,
+  anonymousUserId?: string | null,
 ): Promise<DiagnoseResult> {
   const placement = await prisma.adPlacement.findFirst({
     where: { platformId, placementKey },
@@ -72,7 +73,12 @@ export async function diagnoseForPlatform(
     include: { campaign: { include: { advertiser: true, creatives: true } } },
   });
 
-  const candidates: CandidateEval[] = links.map((l) => {
+  const dayStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+
+  const candidates: CandidateEval[] = [];
+  for (const l of links) {
     const c = l.campaign;
     const reasons: string[] = [];
     if (l.status !== "ACTIVE") reasons.push(`link ${l.status}`);
@@ -87,7 +93,23 @@ export async function diagnoseForPlatform(
       (cr) => cr.approvalStatus === "APPROVED" && cr.status === "ACTIVE",
     );
     if (approved.length === 0) reasons.push("no APPROVED + ACTIVE creatives");
-    return {
+
+    // Per-user frequency cap (only evaluable when a user id is supplied).
+    if (c.frequencyCapPerUserPerDay != null && anonymousUserId) {
+      const seen = await prisma.adImpression.count({
+        where: {
+          campaignId: c.id,
+          anonymousUserId,
+          createdAt: { gte: dayStart },
+        },
+      });
+      if (seen >= c.frequencyCapPerUserPerDay)
+        reasons.push(
+          `frequency cap reached for this user (${seen}/${c.frequencyCapPerUserPerDay} today)`,
+        );
+    }
+
+    candidates.push({
       campaignId: c.id,
       campaignName: c.name,
       advertiser: c.advertiser.businessName,
@@ -96,8 +118,8 @@ export async function diagnoseForPlatform(
       eligible: reasons.length === 0,
       excluded: reasons,
       approvedCreatives: approved.length,
-    };
-  });
+    });
+  }
 
   const eligible = candidates.filter((c) => c.eligible);
   const willServe = eligible.length > 0;

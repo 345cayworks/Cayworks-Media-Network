@@ -40,6 +40,7 @@ export async function GET(req: Request) {
     placementKey,
     userRole: url.searchParams.get("userRole"),
     category: url.searchParams.get("category"),
+    anonymousUserId: url.searchParams.get("anonymousUserId"),
   });
   return NextResponse.json({ ad });
 }

@@ -36,6 +36,7 @@ export async function GET(req: Request) {
     auth.platform.slug,
     auth.platform.id,
     placementKey,
+    url.searchParams.get("anonymousUserId"),
   );
   return NextResponse.json(result);
 }

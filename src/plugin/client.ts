@@ -87,6 +87,7 @@ export async function fetchAd(
   const url = new URL("/api/ads/serve", cfg.engineUrl);
   url.searchParams.set("platform", cfg.platform);
   url.searchParams.set("placement", params.placement);
+  url.searchParams.set("anonymousUserId", anonymousUserId());
   if (params.userRole) url.searchParams.set("userRole", params.userRole);
   if (params.category) url.searchParams.set("category", params.category);
   if (params.pageUrl) url.searchParams.set("pageUrl", params.pageUrl);
@@ -121,6 +122,7 @@ export async function fetchAdQueue(
   url.searchParams.set("platform", cfg.platform);
   url.searchParams.set("placement", params.placement);
   url.searchParams.set("count", String(count));
+  url.searchParams.set("anonymousUserId", anonymousUserId());
   if (params.userRole) url.searchParams.set("userRole", params.userRole);
   if (params.category) url.searchParams.set("category", params.category);
   if (params.pageUrl) url.searchParams.set("pageUrl", params.pageUrl);

@@ -158,6 +158,16 @@ the queue, pauses while the tab is hidden, refreshes the queue every 5
 minutes, and logs **one impression per on-screen rotation**. Omitting
 `rotateSeconds`/`count` preserves the original single-ad behavior.
 
+### Per-user frequency capping
+
+Each campaign has an optional **Frequency Cap (per user / day)**. When set, a
+given anonymous user won't be shown that campaign more than N times in a UTC
+day — the campaign is simply skipped in selection once the cap is reached for
+that user (others still see it). The plugin sends a stable `anonymousUserId`
+(localStorage) on every serve request; server-to-server callers without one
+are not capped. `/api/ads/diagnose?...&anonymousUserId=<id>` reports the cap
+status per campaign.
+
 ### Ad selection logic
 
 Active placement → active campaigns in flight dates → drop campaigns over

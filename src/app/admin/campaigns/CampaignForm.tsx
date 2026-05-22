@@ -91,6 +91,13 @@ export function CampaignForm({
           defaultValue={campaign?.totalImpressionLimit ?? undefined}
           placeholder="optional"
         />
+        <Field
+          label="Frequency Cap (per user / day)"
+          name="frequencyCapPerUserPerDay"
+          type="number"
+          defaultValue={campaign?.frequencyCapPerUserPerDay ?? undefined}
+          placeholder="optional — e.g. 3"
+        />
         <Select
           label="Status"
           name="status"

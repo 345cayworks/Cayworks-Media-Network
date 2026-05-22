@@ -6,6 +6,8 @@ export type ServeParams = {
   placementKey: string;
   userRole?: string | null;
   category?: string | null;
+  /** Used to enforce per-user frequency caps when available. */
+  anonymousUserId?: string | null;
 };
 
 export type AdPayload = {
@@ -106,6 +108,22 @@ async function gatherCandidates(
         where: { campaignId: campaign.id, createdAt: { gte: dayStart } },
       });
       if (today >= campaign.dailyImpressionLimit) continue;
+    }
+
+    // Per-user frequency cap: skip campaigns this anonymous user has already
+    // seen the allowed number of times today.
+    if (
+      campaign.frequencyCapPerUserPerDay != null &&
+      params.anonymousUserId
+    ) {
+      const seen = await prisma.adImpression.count({
+        where: {
+          campaignId: campaign.id,
+          anonymousUserId: params.anonymousUserId,
+          createdAt: { gte: dayStart },
+        },
+      });
+      if (seen >= campaign.frequencyCapPerUserPerDay) continue;
     }
 
     const weight = Math.max(1, campaign.priority) * Math.max(1, link.weight);

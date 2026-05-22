@@ -41,6 +41,7 @@ export async function GET(req: Request) {
     placementKey,
     userRole: url.searchParams.get("userRole"),
     category: url.searchParams.get("category"),
+    anonymousUserId: url.searchParams.get("anonymousUserId"),
   };
 
   // `count` requests a rotation queue; omitting it preserves the single-ad
