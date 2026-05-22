@@ -110,20 +110,30 @@ async function gatherCandidates(
       if (today >= campaign.dailyImpressionLimit) continue;
     }
 
-    // Per-user frequency cap: skip campaigns this anonymous user has already
-    // seen the allowed number of times today.
-    if (
-      campaign.frequencyCapPerUserPerDay != null &&
-      params.anonymousUserId
-    ) {
-      const seen = await prisma.adImpression.count({
-        where: {
-          campaignId: campaign.id,
-          anonymousUserId: params.anonymousUserId,
-          createdAt: { gte: dayStart },
-        },
-      });
-      if (seen >= campaign.frequencyCapPerUserPerDay) continue;
+    // Per-user frequency caps: skip campaigns this anonymous user has already
+    // seen the allowed number of times (rolling hour, and per UTC day).
+    if (params.anonymousUserId) {
+      if (campaign.frequencyCapPerUserPerHour != null) {
+        const hourStart = new Date(now.getTime() - 60 * 60 * 1000);
+        const seenHour = await prisma.adImpression.count({
+          where: {
+            campaignId: campaign.id,
+            anonymousUserId: params.anonymousUserId,
+            createdAt: { gte: hourStart },
+          },
+        });
+        if (seenHour >= campaign.frequencyCapPerUserPerHour) continue;
+      }
+      if (campaign.frequencyCapPerUserPerDay != null) {
+        const seenDay = await prisma.adImpression.count({
+          where: {
+            campaignId: campaign.id,
+            anonymousUserId: params.anonymousUserId,
+            createdAt: { gte: dayStart },
+          },
+        });
+        if (seenDay >= campaign.frequencyCapPerUserPerDay) continue;
+      }
     }
 
     const weight = Math.max(1, campaign.priority) * Math.max(1, link.weight);

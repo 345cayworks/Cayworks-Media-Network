@@ -94,19 +94,27 @@ export async function diagnoseForPlatform(
     );
     if (approved.length === 0) reasons.push("no APPROVED + ACTIVE creatives");
 
-    // Per-user frequency cap (only evaluable when a user id is supplied).
-    if (c.frequencyCapPerUserPerDay != null && anonymousUserId) {
-      const seen = await prisma.adImpression.count({
-        where: {
-          campaignId: c.id,
-          anonymousUserId,
-          createdAt: { gte: dayStart },
-        },
-      });
-      if (seen >= c.frequencyCapPerUserPerDay)
-        reasons.push(
-          `frequency cap reached for this user (${seen}/${c.frequencyCapPerUserPerDay} today)`,
-        );
+    // Per-user frequency caps (only evaluable when a user id is supplied).
+    if (anonymousUserId) {
+      if (c.frequencyCapPerUserPerHour != null) {
+        const hourStart = new Date(now.getTime() - 60 * 60 * 1000);
+        const seenHour = await prisma.adImpression.count({
+          where: { campaignId: c.id, anonymousUserId, createdAt: { gte: hourStart } },
+        });
+        if (seenHour >= c.frequencyCapPerUserPerHour)
+          reasons.push(
+            `hourly frequency cap reached for this user (${seenHour}/${c.frequencyCapPerUserPerHour} in last hour)`,
+          );
+      }
+      if (c.frequencyCapPerUserPerDay != null) {
+        const seenDay = await prisma.adImpression.count({
+          where: { campaignId: c.id, anonymousUserId, createdAt: { gte: dayStart } },
+        });
+        if (seenDay >= c.frequencyCapPerUserPerDay)
+          reasons.push(
+            `daily frequency cap reached for this user (${seenDay}/${c.frequencyCapPerUserPerDay} today)`,
+          );
+      }
     }
 
     candidates.push({

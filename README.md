@@ -160,10 +160,11 @@ minutes, and logs **one impression per on-screen rotation**. Omitting
 
 ### Per-user frequency capping
 
-Each campaign has an optional **Frequency Cap (per user / day)**. When set, a
-given anonymous user won't be shown that campaign more than N times in a UTC
-day — the campaign is simply skipped in selection once the cap is reached for
-that user (others still see it). The plugin sends a stable `anonymousUserId`
+Each campaign has optional **Frequency Caps** — per user **per hour** (rolling
+60-minute window) and **per day** (UTC). When set, a given anonymous user
+won't be shown that campaign more than N times in that window — the campaign
+is simply skipped in selection once a cap is reached for that user (others
+still see it). Both caps apply together when both are set. The plugin sends a stable `anonymousUserId`
 (localStorage) on every serve request; server-to-server callers without one
 are not capped. `/api/ads/diagnose?...&anonymousUserId=<id>` reports the cap
 status per campaign.

@@ -92,6 +92,13 @@ export function CampaignForm({
           placeholder="optional"
         />
         <Field
+          label="Frequency Cap (per user / hour)"
+          name="frequencyCapPerUserPerHour"
+          type="number"
+          defaultValue={campaign?.frequencyCapPerUserPerHour ?? undefined}
+          placeholder="optional — e.g. 1"
+        />
+        <Field
           label="Frequency Cap (per user / day)"
           name="frequencyCapPerUserPerDay"
           type="number"

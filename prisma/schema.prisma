@@ -228,8 +228,9 @@ model Campaign {
   priority             Int               @default(5)
   dailyImpressionLimit Int?
   totalImpressionLimit Int?
-  // Per-user frequency cap: max impressions of this campaign shown to one
-  // anonymous user per day. Null = unlimited.
+  // Per-user frequency caps: max impressions of this campaign shown to one
+  // anonymous user. Null = unlimited. Hour cap is a rolling 60-minute window.
+  frequencyCapPerUserPerHour Int?
   frequencyCapPerUserPerDay Int?
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt

@@ -72,6 +72,7 @@ export const campaignSchema = z
     priority: z.coerce.number().int().min(1).max(10),
     dailyImpressionLimit: z.coerce.number().int().min(0).optional(),
     totalImpressionLimit: z.coerce.number().int().min(0).optional(),
+    frequencyCapPerUserPerHour: z.coerce.number().int().min(0).optional(),
     frequencyCapPerUserPerDay: z.coerce.number().int().min(0).optional(),
   })
   .refine((d) => d.endDate >= d.startDate, {

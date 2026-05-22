@@ -12,6 +12,7 @@ function parse(formData: FormData) {
   // Empty optional numeric fields -> undefined
   if (raw.dailyImpressionLimit === "") delete raw.dailyImpressionLimit;
   if (raw.totalImpressionLimit === "") delete raw.totalImpressionLimit;
+  if (raw.frequencyCapPerUserPerHour === "") delete raw.frequencyCapPerUserPerHour;
   if (raw.frequencyCapPerUserPerDay === "") delete raw.frequencyCapPerUserPerDay;
   return campaignSchema.safeParse(raw);
 }
