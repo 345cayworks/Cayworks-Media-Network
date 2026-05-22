@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authenticatePlatform } from "@/lib/platform-auth";
-import { selectAd } from "@/lib/ad-selection";
+import { selectAd, selectAdQueue } from "@/lib/ad-selection";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,14 +36,27 @@ export async function GET(req: Request) {
     );
   }
 
-  try {
-    const ad = await selectAd({
-      platformId: auth.platform.id,
-      placementKey,
-      userRole: url.searchParams.get("userRole"),
-      category: url.searchParams.get("category"),
-    });
+  const selectParams = {
+    platformId: auth.platform.id,
+    placementKey,
+    userRole: url.searchParams.get("userRole"),
+    category: url.searchParams.get("category"),
+  };
 
+  // `count` requests a rotation queue; omitting it preserves the single-ad
+  // response shape for existing integrations.
+  const countRaw = url.searchParams.get("count");
+  const count = countRaw ? Math.min(Math.max(parseInt(countRaw, 10) || 0, 1), 20) : 0;
+
+  try {
+    if (count > 0) {
+      const ads = await selectAdQueue(selectParams, count);
+      return NextResponse.json(
+        { ads, ad: ads[0] ?? null },
+        { status: 200, headers: noStore },
+      );
+    }
+    const ad = await selectAd(selectParams);
     // Graceful fallback: 200 with ad:null so the client simply hides the slot.
     return NextResponse.json({ ad }, { status: 200, headers: noStore });
   } catch (err) {

@@ -140,6 +140,24 @@ curl "https://ads.cayworks.com/api/ads/serve?platform=cayrentmanager&placement=l
   -H "X-Ad-Engine-Key: cae_live_..."
 ```
 
+### Timed rotation
+
+Add `rotateSeconds` to any slot to cycle multiple ads on a timer:
+
+```tsx
+<AdSlot platform="asicayman" placement="asi_dashboard_top"
+        rotateSeconds={15} userRole="MEMBER" engineUrl={...} apiKey={...} />
+```
+
+The server builds a weighted rotation queue (`GET /api/ads/serve?count=N`,
+returns `{ ads: [...] }`) using **smooth weighted round-robin**: a campaign
+with effective weight W appears ~W× more often than a weight-1 campaign, but
+interleaved (no back-to-back repeats when more than one campaign is
+eligible). Effective weight = `priority × placementWeight`. The client cycles
+the queue, pauses while the tab is hidden, refreshes the queue every 5
+minutes, and logs **one impression per on-screen rotation**. Omitting
+`rotateSeconds`/`count` preserves the original single-ad behavior.
+
 ### Ad selection logic
 
 Active placement → active campaigns in flight dates → drop campaigns over

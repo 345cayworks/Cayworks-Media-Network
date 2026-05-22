@@ -103,6 +103,40 @@ export async function fetchAd(
   }
 }
 
+/**
+ * Fetch a weighted rotation queue of up to `count` ads for a placement.
+ * Heavier-weight campaigns appear proportionally more often in the order.
+ */
+export async function fetchAdQueue(
+  cfg: AdEngineConfig,
+  params: {
+    placement: string;
+    userRole?: string;
+    category?: string;
+    pageUrl?: string;
+  },
+  count: number,
+): Promise<AdPayload[]> {
+  const url = new URL("/api/ads/serve", cfg.engineUrl);
+  url.searchParams.set("platform", cfg.platform);
+  url.searchParams.set("placement", params.placement);
+  url.searchParams.set("count", String(count));
+  if (params.userRole) url.searchParams.set("userRole", params.userRole);
+  if (params.category) url.searchParams.set("category", params.category);
+  if (params.pageUrl) url.searchParams.set("pageUrl", params.pageUrl);
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { "X-Ad-Engine-Key": cfg.apiKey },
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { ads?: AdPayload[] };
+    return json.ads ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export function recordImpression(
   cfg: AdEngineConfig,
   ad: AdPayload,

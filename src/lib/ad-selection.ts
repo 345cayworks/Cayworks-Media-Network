@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type ServeParams = {
@@ -37,19 +38,30 @@ function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
+const CAMPAIGN_LINK_INCLUDE = {
+  campaign: {
+    include: {
+      advertiser: true,
+      creatives: { where: { approvalStatus: "APPROVED", status: "ACTIVE" } },
+    },
+  },
+} satisfies Prisma.CampaignPlacementInclude;
+
+type CampaignLink = Prisma.CampaignPlacementGetPayload<{
+  include: typeof CAMPAIGN_LINK_INCLUDE;
+}>;
+type Creative = CampaignLink["campaign"]["creatives"][number];
+type Candidate = { link: CampaignLink; weight: number };
+
 /**
- * Core ad-selection algorithm.
- *
- *  - resolves the active placement for the platform
- *  - finds ACTIVE campaigns linked to it within their flight dates
- *  - drops campaigns that hit their daily / total impression caps
- *  - optionally biases toward an advertiser industry (category)
- *  - weighted-random pick by (campaign.priority * campaignPlacement.weight)
- *  - returns one APPROVED + ACTIVE creative, or null when nothing is eligible
+ * Resolve the active placement and the eligible campaigns linked to it:
+ * active campaigns within flight dates, active advertiser, billing not
+ * on-hold, daily/total impression caps not exceeded, ≥1 approved creative.
+ * Effective weight = max(1, priority) * max(1, placementWeight).
  */
-export async function selectAd(
+async function gatherCandidates(
   params: ServeParams,
-): Promise<AdPayload | null> {
+): Promise<{ placementId: string; candidates: Candidate[] } | null> {
   const now = new Date();
 
   const placement = await prisma.adPlacement.findFirst({
@@ -71,22 +83,8 @@ export async function selectAd(
         endDate: { gte: now },
       },
     },
-    include: {
-      campaign: {
-        include: {
-          advertiser: true,
-          creatives: {
-            where: { approvalStatus: "APPROVED", status: "ACTIVE" },
-          },
-        },
-      },
-    },
+    include: CAMPAIGN_LINK_INCLUDE,
   });
-
-  type Candidate = {
-    link: (typeof links)[number];
-    weight: number;
-  };
 
   const dayStart = startOfUtcDay(now);
   const candidates: Candidate[] = [];
@@ -110,51 +108,43 @@ export async function selectAd(
       if (today >= campaign.dailyImpressionLimit) continue;
     }
 
-    // Effective weight: campaign priority amplified by per-placement weight.
     const weight = Math.max(1, campaign.priority) * Math.max(1, link.weight);
     candidates.push({ link, weight });
   }
 
-  if (candidates.length === 0) return null;
+  return { placementId: placement.id, candidates };
+}
 
-  // Bias toward category (advertiser industry) when requested, but never
-  // starve the slot: fall back to the full set if nothing matches.
-  let pool = candidates;
-  if (params.category) {
-    const cat = params.category.toLowerCase().trim();
-    const matched = candidates.filter(
-      (c) =>
-        (c.link.campaign.advertiser.industry ?? "").toLowerCase().trim() ===
-        cat,
-    );
-    if (matched.length > 0) pool = matched;
-  }
+// Bias toward category (advertiser industry) when requested, but never
+// starve the slot: fall back to the full set if nothing matches.
+function applyCategory(
+  candidates: Candidate[],
+  category?: string | null,
+): Candidate[] {
+  if (!category) return candidates;
+  const cat = category.toLowerCase().trim();
+  const matched = candidates.filter(
+    (c) =>
+      (c.link.campaign.advertiser.industry ?? "").toLowerCase().trim() === cat,
+  );
+  return matched.length > 0 ? matched : candidates;
+}
 
-  const total = pool.reduce((sum, c) => sum + c.weight, 0);
-  let roll = Math.random() * total;
-  let chosen = pool[0];
-  for (const c of pool) {
-    roll -= c.weight;
-    if (roll <= 0) {
-      chosen = c;
-      break;
-    }
-  }
-
-  const campaign = chosen.link.campaign;
-  // Rotate creatives within the winning campaign as well.
-  const creative =
-    campaign.creatives[Math.floor(Math.random() * campaign.creatives.length)];
-
+function buildPayload(
+  link: CampaignLink,
+  creative: Creative,
+  placementId: string,
+  platformId: string,
+): AdPayload {
+  const campaign = link.campaign;
   const label =
     LABELS[Math.abs(hashString(campaign.id)) % LABELS.length] ?? LABELS[0];
-
   return {
     adId: creative.id,
     campaignId: campaign.id,
     creativeId: creative.id,
-    placementId: placement.id,
-    platformId: params.platformId,
+    placementId,
+    platformId,
     creativeType: creative.creativeType,
     title: creative.title,
     description: creative.description,
@@ -166,6 +156,78 @@ export async function selectAd(
     height: creative.height,
     label,
   };
+}
+
+/**
+ * Select a single ad: weighted-random pick of an eligible campaign, then a
+ * random approved creative within it. Returns null when nothing is eligible.
+ */
+export async function selectAd(
+  params: ServeParams,
+): Promise<AdPayload | null> {
+  const g = await gatherCandidates(params);
+  if (!g || g.candidates.length === 0) return null;
+
+  const pool = applyCategory(g.candidates, params.category);
+  const total = pool.reduce((sum, c) => sum + c.weight, 0);
+  let roll = Math.random() * total;
+  let chosen = pool[0];
+  for (const c of pool) {
+    roll -= c.weight;
+    if (roll <= 0) {
+      chosen = c;
+      break;
+    }
+  }
+
+  const creatives = chosen.link.campaign.creatives;
+  const creative = creatives[Math.floor(Math.random() * creatives.length)];
+  return buildPayload(chosen.link, creative, g.placementId, params.platformId);
+}
+
+/**
+ * Build an ordered rotation queue of up to `count` ads using smooth weighted
+ * round-robin (the Nginx SWRR algorithm). A campaign with weight W appears
+ * ~W times more often than a weight-1 campaign, but the appearances are
+ * interleaved rather than clustered, and back-to-back repeats are avoided
+ * whenever more than one campaign is eligible. Creatives within a campaign
+ * rotate round-robin. Returns [] when nothing is eligible.
+ */
+export async function selectAdQueue(
+  params: ServeParams,
+  count: number,
+): Promise<AdPayload[]> {
+  const g = await gatherCandidates(params);
+  if (!g || g.candidates.length === 0) return [];
+
+  const pool = applyCategory(g.candidates, params.category);
+  const distinctCombos = pool.reduce(
+    (sum, c) => sum + c.link.campaign.creatives.length,
+    0,
+  );
+  // No point repeating a single image; otherwise honor the requested length
+  // (capped) so heavier-weight campaigns get their extra appearances.
+  const n = distinctCombos <= 1 ? 1 : Math.max(1, Math.min(count, 20));
+
+  const totalW = pool.reduce((sum, c) => sum + c.weight, 0);
+  const state = pool.map((c) => ({ c, cw: 0, ci: 0 }));
+  const out: AdPayload[] = [];
+
+  for (let i = 0; i < n; i++) {
+    let best = state[0];
+    for (const s of state) {
+      s.cw += s.c.weight;
+      if (s.cw > best.cw) best = s;
+    }
+    best.cw -= totalW;
+    const creatives = best.c.link.campaign.creatives;
+    const creative = creatives[best.ci % creatives.length];
+    best.ci++;
+    out.push(
+      buildPayload(best.c.link, creative, g.placementId, params.platformId),
+    );
+  }
+  return out;
 }
 
 function hashString(s: string): number {

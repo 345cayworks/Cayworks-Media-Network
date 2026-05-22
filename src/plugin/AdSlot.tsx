@@ -3,12 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import {
   fetchAd,
+  fetchAdQueue,
   recordImpression,
   recordClick,
   resolveVideo,
   type AdPayload,
   type AdEngineConfig,
 } from "./client";
+
+const QUEUE_REFRESH_MS = 5 * 60 * 1000;
 
 export type AdVariant = "banner" | "card" | "native" | "video" | "auto";
 
@@ -25,6 +28,14 @@ export type AdSlotProps = {
   category?: string;
   variant?: AdVariant;
   className?: string;
+  /**
+   * Enable timed rotation. When set (> 0), the slot fetches a weighted
+   * rotation queue and cycles through it every `rotateSeconds` seconds.
+   * Heavier-weight campaigns appear proportionally more often.
+   */
+  rotateSeconds?: number;
+  /** Rotation queue length to request (default 12, server-capped at 20). */
+  queueSize?: number;
   /**
    * When true, logs the fetch lifecycle to the console and renders a visible
    * placeholder when no ad is available — useful while wiring up a new app.
@@ -44,11 +55,29 @@ export function AdSlot(props: AdSlotProps) {
   const { engineUrl, apiKey, platform, placement, userRole, category } = props;
   const cfg: AdEngineConfig = { engineUrl, apiKey, platform };
 
-  const [ad, setAd] = useState<AdPayload | null>(null);
-  const [ready, setReady] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const impressionFired = useRef(false);
+  const rotate = (props.rotateSeconds ?? 0) > 0;
+  const queueSize = props.queueSize ?? 12;
 
+  const [ads, setAds] = useState<AdPayload[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [ready, setReady] = useState(false);
+  // Monotonic counter: increments on every distinct display (initial + each
+  // rotation) so every on-screen view is counted as exactly one impression.
+  const [displayKey, setDisplayKey] = useState(0);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const visibleRef = useRef(false);
+  const firedKeyRef = useRef(-1);
+  const adsRef = useRef<AdPayload[]>(ads);
+  adsRef.current = ads;
+
+  const current = ads.length ? ads[idx % ads.length] : null;
+  const currentRef = useRef(current);
+  currentRef.current = current;
+  const displayKeyRef = useRef(displayKey);
+  displayKeyRef.current = displayKey;
+
+  // Initial fetch (single ad, or a rotation queue when rotate is enabled).
   useEffect(() => {
     let active = true;
     if (props.debug) {
@@ -59,36 +88,79 @@ export function AdSlot(props: AdSlotProps) {
         placement,
         userRole,
         category,
+        rotate,
         keyPreview: apiKey ? `${apiKey.slice(0, 10)}…` : "(empty)",
       });
     }
-    fetchAd(cfg, { placement, userRole, category }).then((result) => {
+    async function load() {
+      const result = rotate
+        ? await fetchAdQueue(cfg, { placement, userRole, category }, queueSize)
+        : await fetchAd(cfg, { placement, userRole, category }).then((a) =>
+            a ? [a] : [],
+          );
       if (!active) return;
       if (props.debug) {
         // eslint-disable-next-line no-console
-        console.log("[AdSlot] result", result ?? "(no ad)");
+        console.log("[AdSlot] result", result.length ? result : "(no ad)");
       }
-      setAd(result);
+      setAds(result);
+      setIdx(0);
       setReady(true);
-    });
+      setDisplayKey((k) => k + 1);
+    }
+    load();
     return () => {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engineUrl, apiKey, platform, placement, userRole, category]);
+  }, [engineUrl, apiKey, platform, placement, userRole, category, rotate, queueSize]);
 
-  // Record an impression only once the ad is actually visible.
+  // Rotation timer. Pauses while the tab is hidden so off-screen ads don't
+  // burn impressions.
   useEffect(() => {
-    if (!ad || !containerRef.current || impressionFired.current) return;
+    if (!rotate) return;
+    const ms = Math.max(2, props.rotateSeconds as number) * 1000;
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (adsRef.current.length <= 1) return;
+      setIdx((p) => (p + 1) % adsRef.current.length);
+      setDisplayKey((k) => k + 1);
+    }, ms);
+    return () => clearInterval(id);
+  }, [rotate, props.rotateSeconds]);
+
+  // Periodically refresh the queue so eligibility / cap changes are picked up.
+  useEffect(() => {
+    if (!rotate) return;
+    const id = setInterval(async () => {
+      const q = await fetchAdQueue(
+        cfg,
+        { placement, userRole, category },
+        queueSize,
+      );
+      if (q.length) setAds(q);
+    }, QUEUE_REFRESH_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rotate, engineUrl, apiKey, platform, placement, userRole, category, queueSize]);
+
+  function fireIfVisible() {
+    const ad = currentRef.current;
+    if (!ad || !visibleRef.current) return;
+    if (firedKeyRef.current === displayKeyRef.current) return;
+    firedKeyRef.current = displayKeyRef.current;
+    recordImpression(cfg, ad, { userRole });
+  }
+
+  // Track visibility; (re)attaches when the rendered ad changes.
+  useEffect(() => {
     const el = containerRef.current;
+    if (!el) return;
     const obs = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting && !impressionFired.current) {
-            impressionFired.current = true;
-            recordImpression(cfg, ad, { userRole });
-            obs.disconnect();
-          }
+          visibleRef.current = e.isIntersecting && e.intersectionRatio >= 0.5;
+          if (visibleRef.current) fireIfVisible();
         }
       },
       { threshold: 0.5 },
@@ -96,9 +168,16 @@ export function AdSlot(props: AdSlotProps) {
     obs.observe(el);
     return () => obs.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ad]);
+  }, [ready, current?.creativeId]);
+
+  // Fire an impression each time the displayed ad changes (while visible).
+  useEffect(() => {
+    fireIfVisible();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayKey]);
 
   async function onClick(e: React.MouseEvent) {
+    const ad = currentRef.current;
     if (!ad) return;
     e.preventDefault();
     const dest = await recordClick(cfg, ad);
@@ -106,7 +185,7 @@ export function AdSlot(props: AdSlotProps) {
   }
 
   // Graceful fallback: render nothing if no ad is available.
-  if (!ready || !ad) {
+  if (!ready || !current) {
     if (props.debug && ready) {
       return (
         <div
@@ -128,7 +207,7 @@ export function AdSlot(props: AdSlotProps) {
     return null;
   }
 
-  const variant = pickVariant(props.variant, ad);
+  const variant = pickVariant(props.variant, current);
 
   // Video isn't wrapped in the anchor: an iframe/video would swallow the
   // click. It renders the player plus a tracked CTA button instead.
@@ -139,7 +218,7 @@ export function AdSlot(props: AdSlotProps) {
         className={props.className}
         data-cae-placement={placement}
       >
-        <VideoAd ad={ad} onCta={(e) => onClick(e)} />
+        <VideoAd ad={current} onCta={(e) => onClick(e)} />
       </div>
     );
   }
@@ -151,14 +230,14 @@ export function AdSlot(props: AdSlotProps) {
       data-cae-placement={placement}
     >
       <a
-        href={ad.destinationUrl}
+        href={current.destinationUrl}
         onClick={onClick}
         rel="noopener noreferrer sponsored"
         style={{ textDecoration: "none", color: "inherit", display: "block" }}
       >
-        {variant === "banner" && <BannerAd ad={ad} />}
-        {variant === "card" && <CardAd ad={ad} />}
-        {variant === "native" && <NativeAdView ad={ad} />}
+        {variant === "banner" && <BannerAd ad={current} />}
+        {variant === "card" && <CardAd ad={current} />}
+        {variant === "native" && <NativeAdView ad={current} />}
       </a>
     </div>
   );
