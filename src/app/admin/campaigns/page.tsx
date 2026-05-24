@@ -1,14 +1,82 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export default async function CampaignsPage() {
+type SortKey = "name" | "advertiser" | "flight" | "status" | "created";
+type Dir = "asc" | "desc";
+
+const SORTABLE: ReadonlySet<SortKey> = new Set([
+  "name",
+  "advertiser",
+  "flight",
+  "status",
+  "created",
+]);
+
+function orderByFor(sort: SortKey, dir: Dir): Prisma.CampaignOrderByWithRelationInput {
+  switch (sort) {
+    case "name":
+      return { name: dir };
+    case "advertiser":
+      return { advertiser: { businessName: dir } };
+    case "flight":
+      return { startDate: dir };
+    case "status":
+      return { status: dir };
+    default:
+      return { createdAt: dir };
+  }
+}
+
+function SortHeader({
+  label,
+  k,
+  current,
+  dir,
+}: {
+  label: string;
+  k: SortKey;
+  current: SortKey;
+  dir: Dir;
+}) {
+  const active = current === k;
+  const nextDir: Dir = active && dir === "asc" ? "desc" : "asc";
+  const arrow = active ? (dir === "asc" ? "▲" : "▼") : "";
+  return (
+    <th className="th">
+      <Link
+        href={`/admin/campaigns?sort=${k}&dir=${nextDir}`}
+        className={
+          active
+            ? "inline-flex items-center gap-1 text-brand-600"
+            : "inline-flex items-center gap-1 hover:text-slate-700"
+        }
+      >
+        {label}
+        <span className="text-[10px]">{arrow}</span>
+      </Link>
+    </th>
+  );
+}
+
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams: { sort?: string; dir?: string };
+}) {
   await requireUser();
+
+  const sort: SortKey = SORTABLE.has(searchParams.sort as SortKey)
+    ? (searchParams.sort as SortKey)
+    : "created";
+  const dir: Dir = searchParams.dir === "asc" ? "asc" : "desc";
+
   const campaigns = await prisma.campaign.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: orderByFor(sort, dir),
     include: {
       advertiser: { select: { businessName: true } },
       _count: { select: { creatives: true, campaignPlacements: true } },
@@ -29,13 +97,13 @@ export default async function CampaignsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">Campaign</th>
-                <th className="th">Advertiser</th>
-                <th className="th">Flight</th>
+                <SortHeader label="Campaign" k="name" current={sort} dir={dir} />
+                <SortHeader label="Advertiser" k="advertiser" current={sort} dir={dir} />
+                <SortHeader label="Flight" k="flight" current={sort} dir={dir} />
                 <th className="th">Pricing</th>
                 <th className="th">Prio</th>
                 <th className="th">Creatives</th>
-                <th className="th">Status</th>
+                <SortHeader label="Status" k="status" current={sort} dir={dir} />
               </tr>
             </thead>
             <tbody>
