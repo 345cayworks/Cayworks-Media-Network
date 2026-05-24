@@ -6,7 +6,14 @@ import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-type SortKey = "business" | "contact" | "industry" | "status" | "created";
+type SortKey =
+  | "business"
+  | "contact"
+  | "industry"
+  | "status"
+  | "impressions"
+  | "clicks"
+  | "created";
 type Dir = "asc" | "desc";
 
 const SORTABLE: ReadonlySet<SortKey> = new Set([
@@ -14,6 +21,8 @@ const SORTABLE: ReadonlySet<SortKey> = new Set([
   "contact",
   "industry",
   "status",
+  "impressions",
+  "clicks",
   "created",
 ]);
 
@@ -28,11 +37,12 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.AdvertiserOrderByWithRelati
     case "status":
       return { status: dir };
     default:
+      // impressions / clicks are sorted in JS after aggregation.
       return { createdAt: dir };
   }
 }
 
-function SortHeader({
+function SortHeaderInline({
   label,
   k,
   current,
@@ -47,18 +57,29 @@ function SortHeader({
   const nextDir: Dir = active && dir === "asc" ? "desc" : "asc";
   const arrow = active ? (dir === "asc" ? "▲" : "▼") : "";
   return (
+    <Link
+      href={`/admin/advertisers?sort=${k}&dir=${nextDir}`}
+      className={
+        active
+          ? "inline-flex items-center gap-1 text-brand-600"
+          : "inline-flex items-center gap-1 hover:text-slate-700"
+      }
+    >
+      {label}
+      <span className="text-[10px]">{arrow}</span>
+    </Link>
+  );
+}
+
+function SortHeader(props: {
+  label: string;
+  k: SortKey;
+  current: SortKey;
+  dir: Dir;
+}) {
+  return (
     <th className="th">
-      <Link
-        href={`/admin/advertisers?sort=${k}&dir=${nextDir}`}
-        className={
-          active
-            ? "inline-flex items-center gap-1 text-brand-600"
-            : "inline-flex items-center gap-1 hover:text-slate-700"
-        }
-      >
-        {label}
-        <span className="text-[10px]">{arrow}</span>
-      </Link>
+      <SortHeaderInline {...props} />
     </th>
   );
 }
@@ -75,7 +96,7 @@ export default async function AdvertisersPage({
     : "created";
   const dir: Dir = searchParams.dir === "asc" ? "asc" : "desc";
 
-  const advertisers = await prisma.advertiser.findMany({
+  const advertisersRaw = await prisma.advertiser.findMany({
     orderBy: orderByFor(sort, dir),
     include: { _count: { select: { campaigns: true } } },
   });
@@ -105,6 +126,22 @@ export default async function AdvertisersPage({
     if (advId) clkByAdv.set(advId, (clkByAdv.get(advId) ?? 0) + r._count._all);
   }
 
+  // Aggregate-based sorts are applied in JS after the rollup above.
+  const advertisers =
+    sort === "impressions" || sort === "clicks"
+      ? [...advertisersRaw].sort((a, b) => {
+          const av =
+            sort === "impressions"
+              ? (impByAdv.get(a.id) ?? 0)
+              : (clkByAdv.get(a.id) ?? 0);
+          const bv =
+            sort === "impressions"
+              ? (impByAdv.get(b.id) ?? 0)
+              : (clkByAdv.get(b.id) ?? 0);
+          return dir === "asc" ? av - bv : bv - av;
+        })
+      : advertisersRaw;
+
   return (
     <div>
       <PageHeader
@@ -125,8 +162,22 @@ export default async function AdvertisersPage({
                 <SortHeader label="Contact" k="contact" current={sort} dir={dir} />
                 <SortHeader label="Industry" k="industry" current={sort} dir={dir} />
                 <th className="th">Campaigns</th>
-                <th className="th text-right">Impressions</th>
-                <th className="th text-right">Clicks</th>
+                <th className="th text-right">
+                  <SortHeaderInline
+                    label="Impressions"
+                    k="impressions"
+                    current={sort}
+                    dir={dir}
+                  />
+                </th>
+                <th className="th text-right">
+                  <SortHeaderInline
+                    label="Clicks"
+                    k="clicks"
+                    current={sort}
+                    dir={dir}
+                  />
+                </th>
                 <th className="th">Billing</th>
                 <SortHeader label="Status" k="status" current={sort} dir={dir} />
               </tr>
