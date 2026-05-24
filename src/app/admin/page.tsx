@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { requireUser, getSessionUser, ADMIN_ROLES } from "@/lib/auth";
-import { dashboardStats } from "@/lib/reporting";
+import { dashboardStats, dailyCounts, buildReport } from "@/lib/reporting";
 import { prisma } from "@/lib/prisma";
-import { Stat, PageHeader, Badge, EmptyState } from "@/components/ui";
+import {
+  Stat,
+  PageHeader,
+  Badge,
+  EmptyState,
+  SectionTitle,
+} from "@/components/ui";
+import { HBar, ColumnChart } from "@/components/Chart";
 import { setPlatformStatus } from "./platforms/actions";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +18,25 @@ export default async function DashboardPage() {
   await requireUser();
   const sessionUser = await getSessionUser();
   const canToggle = !!sessionUser && ADMIN_ROLES.includes(sessionUser.role);
-  const s = await dashboardStats({});
-  const platforms = await prisma.platform.findMany({
-    orderBy: { name: "asc" },
-    include: { _count: { select: { placements: true } } },
-  });
+
+  const since7 = new Date();
+  since7.setUTCDate(since7.getUTCDate() - 7);
+
+  const [s, platforms, daily, topCampaigns] = await Promise.all([
+    dashboardStats({}),
+    prisma.platform.findMany({
+      orderBy: { name: "asc" },
+      include: { _count: { select: { placements: true } } },
+    }),
+    dailyCounts(14),
+    buildReport("campaign", { from: since7 }),
+  ]);
+
+  const top5 = topCampaigns.slice(0, 5).map((r) => ({
+    label: r.label,
+    value: r.impressions,
+    sub: `${r.ctr.toFixed(1)}% CTR`,
+  }));
 
   return (
     <div>
@@ -25,22 +46,64 @@ export default async function DashboardPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Advertisers" value={s.advertisers} />
-        <Stat label="Active Campaigns" value={s.activeCampaigns} />
+        <Stat label="Advertisers" value={s.advertisers} accent="brand" />
+        <Stat label="Active Campaigns" value={s.activeCampaigns} accent="emerald" />
         <Stat
           label="Monthly Revenue"
           value={`$${s.monthlyRevenue.toLocaleString()}`}
           hint="Paid invoices, current month"
+          accent="emerald"
         />
-        <Stat label="Impressions" value={s.impressions.toLocaleString()} />
-        <Stat label="Clicks" value={s.clicks.toLocaleString()} />
-        <Stat label="CTR" value={`${s.ctr.toFixed(2)}%`} />
+        <Stat
+          label="Impressions"
+          value={s.impressions.toLocaleString()}
+          accent="brand"
+        />
+        <Stat
+          label="Clicks"
+          value={s.clicks.toLocaleString()}
+          accent="brand"
+        />
+        <Stat label="CTR" value={`${s.ctr.toFixed(2)}%`} accent="brand" />
         <Stat
           label="Pending Creatives"
           value={s.pendingCreatives}
           hint="Awaiting approval"
+          accent="amber"
         />
-        <Stat label="Expiring (14d)" value={s.expiring.length} />
+        <Stat
+          label="Expiring (14d)"
+          value={s.expiring.length}
+          accent={s.expiring.length > 0 ? "rose" : "slate"}
+        />
+      </div>
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-3">
+        <div className="card p-4 lg:col-span-2">
+          <SectionTitle
+            title="Last 14 days"
+            hint="Daily impressions (blue) and clicks (grey)"
+          />
+          <ColumnChart
+            data={daily.map((d) => ({
+              label: d.date,
+              value: d.impressions,
+              secondary: d.clicks,
+            }))}
+            secondaryKey="secondary"
+            height={140}
+          />
+        </div>
+        <div className="card p-4">
+          <SectionTitle
+            title="Top campaigns · 7d"
+            hint="By impressions"
+          />
+          <HBar
+            data={top5}
+            emptyText="No traffic in the last 7 days yet."
+          />
+        </div>
       </div>
 
       <div className="mt-8 card">

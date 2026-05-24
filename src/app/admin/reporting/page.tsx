@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireRole, REPORT_ROLES } from "@/lib/auth";
 import { buildReport, type DateRange } from "@/lib/reporting";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader, EmptyState, SectionTitle } from "@/components/ui";
+import { HBar } from "@/components/Chart";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,23 @@ export default async function ReportingPage({
       {rows.length === 0 ? (
         <EmptyState message="No data for the selected range." />
       ) : (
-        <div className="card overflow-x-auto">
+        <>
+          <div className="card mb-4 p-4">
+            <SectionTitle
+              title="Impressions"
+              hint={`Top ${Math.min(10, rows.length)} ${
+                TABS.find((t) => t.key === dim)?.label.toLowerCase() ?? ""
+              }`}
+            />
+            <HBar
+              data={rows.slice(0, 10).map((r) => ({
+                label: r.label,
+                value: r.impressions,
+                sub: `${r.ctr.toFixed(1)}% CTR`,
+              }))}
+            />
+          </div>
+          <div className="card overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
@@ -132,6 +149,7 @@ export default async function ReportingPage({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

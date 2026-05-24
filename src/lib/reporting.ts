@@ -246,3 +246,51 @@ export async function dashboardStats(range: DateRange) {
     expiring,
   };
 }
+
+/**
+ * Per-day impression + click counts for the last `days` UTC days, oldest
+ * first. Used by the dashboard trend chart. Pulls rows and buckets them in
+ * JS — fine for the data volumes here.
+ */
+export async function dailyCounts(
+  days: number,
+): Promise<{ date: string; impressions: number; clicks: number }[]> {
+  const since = new Date();
+  since.setUTCHours(0, 0, 0, 0);
+  since.setUTCDate(since.getUTCDate() - (days - 1));
+
+  const [imps, clks] = await Promise.all([
+    prisma.adImpression.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true },
+    }),
+    prisma.adClick.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const series: { date: string; impressions: number; clicks: number }[] = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(since);
+    d.setUTCDate(since.getUTCDate() + i);
+    series.push({ date: d.toISOString().slice(0, 10), impressions: 0, clicks: 0 });
+  }
+  const indexOf = (date: Date) => {
+    const ds = new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    )
+      .toISOString()
+      .slice(0, 10);
+    return series.findIndex((s) => s.date === ds);
+  };
+  for (const r of imps) {
+    const i = indexOf(r.createdAt);
+    if (i >= 0) series[i].impressions++;
+  }
+  for (const r of clks) {
+    const i = indexOf(r.createdAt);
+    if (i >= 0) series[i].clicks++;
+  }
+  return series;
+}

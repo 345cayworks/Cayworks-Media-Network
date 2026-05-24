@@ -42,22 +42,62 @@ export function Badge({ value }: { value: string }) {
   );
 }
 
+const ACCENT: Record<string, string> = {
+  brand: "from-brand-500/15 to-brand-500/0 ring-brand-500/30",
+  emerald: "from-emerald-500/15 to-emerald-500/0 ring-emerald-500/30",
+  amber: "from-amber-500/15 to-amber-500/0 ring-amber-500/30",
+  rose: "from-rose-500/15 to-rose-500/0 ring-rose-500/30",
+  slate: "from-slate-500/10 to-slate-500/0 ring-slate-300",
+};
+
 export function Stat({
   label,
   value,
   hint,
+  accent = "brand",
 }: {
   label: string;
   value: string | number;
   hint?: string;
+  accent?: keyof typeof ACCENT;
 }) {
   return (
-    <div className="card p-4">
-      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
+    <div className="card relative overflow-hidden p-4">
+      <div
+        className={clsx(
+          "pointer-events-none absolute -top-6 -right-6 h-20 w-20 rounded-full bg-gradient-to-br",
+          ACCENT[accent] ?? ACCENT.brand,
+        )}
+      />
+      <div className="relative">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </div>
+        <div className="mt-1 text-2xl font-bold tabular-nums text-slate-900">
+          {value}
+        </div>
+        {hint && <div className="mt-0.5 text-xs text-slate-400">{hint}</div>}
       </div>
-      <div className="mt-1 text-2xl font-bold text-slate-900">{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-slate-400">{hint}</div>}
+    </div>
+  );
+}
+
+export function SectionTitle({
+  title,
+  hint,
+  right,
+}: {
+  title: string;
+  hint?: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-3 flex items-end justify-between gap-3">
+      <div>
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
+        {hint && <p className="text-xs text-slate-500">{hint}</p>}
+      </div>
+      {right}
     </div>
   );
 }
