@@ -17,10 +17,10 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const dimRaw = url.searchParams.get("groupBy") ?? "campaign";
-  const dim = (["campaign", "platform", "placement"] as const).includes(
+  const dim = (["campaign", "platform", "placement", "advertiser"] as const).includes(
     dimRaw as "campaign",
   )
-    ? (dimRaw as "campaign" | "platform" | "placement")
+    ? (dimRaw as "campaign" | "platform" | "placement" | "advertiser")
     : "campaign";
 
   const range: DateRange = {};

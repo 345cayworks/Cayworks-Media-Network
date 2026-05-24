@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const TABS = [
   { key: "campaign", label: "By Campaign" },
+  { key: "advertiser", label: "By Advertiser" },
   { key: "platform", label: "By Platform" },
   { key: "placement", label: "By Placement" },
 ] as const;
@@ -19,7 +20,7 @@ export default async function ReportingPage({
   await requireRole(REPORT_ROLES);
 
   const dim = (TABS.find((t) => t.key === searchParams.groupBy)?.key ??
-    "campaign") as "campaign" | "platform" | "placement";
+    "campaign") as "campaign" | "advertiser" | "platform" | "placement";
 
   const range: DateRange = {};
   if (searchParams.from && !Number.isNaN(Date.parse(searchParams.from)))

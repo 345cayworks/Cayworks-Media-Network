@@ -22,7 +22,7 @@ function ctr(impressions: number, clicks: number): number {
   return impressions === 0 ? 0 : (clicks / impressions) * 100;
 }
 
-type Dim = "campaign" | "platform" | "placement";
+type Dim = "campaign" | "platform" | "placement" | "advertiser";
 
 /** Aggregate impressions / clicks / conversions grouped by a dimension. */
 export async function buildReport(
@@ -30,6 +30,75 @@ export async function buildReport(
   range: DateRange,
 ): Promise<ReportRow[]> {
   const where = rangeFilter(range);
+
+  // Advertiser isn't a column on the tracking tables — roll it up from the
+  // per-campaign aggregates via campaign.advertiserId.
+  if (dim === "advertiser") {
+    const [imps, clks, convs] = await Promise.all([
+      prisma.adImpression.groupBy({
+        by: ["campaignId"],
+        where,
+        _count: { _all: true },
+      }),
+      prisma.adClick.groupBy({
+        by: ["campaignId"],
+        where,
+        _count: { _all: true },
+      }),
+      prisma.adConversion.groupBy({
+        by: ["campaignId"],
+        where,
+        _count: { _all: true },
+      }),
+    ]);
+    const campaignIds = new Set<string>();
+    for (const r of imps) if (r.campaignId) campaignIds.add(r.campaignId);
+    for (const r of clks) if (r.campaignId) campaignIds.add(r.campaignId);
+    for (const r of convs) if (r.campaignId) campaignIds.add(r.campaignId);
+
+    const campaigns = await prisma.campaign.findMany({
+      where: { id: { in: [...campaignIds] } },
+      select: {
+        id: true,
+        advertiserId: true,
+        advertiser: { select: { businessName: true } },
+      },
+    });
+    const campaignToAdv = new Map(
+      campaigns.map((c) => [c.id, { id: c.advertiserId, label: c.advertiser.businessName }]),
+    );
+
+    const adMap = new Map<string, ReportRow>();
+    const ensureAd = (id: string, label: string) => {
+      if (!adMap.has(id))
+        adMap.set(id, {
+          key: id,
+          label,
+          impressions: 0,
+          clicks: 0,
+          ctr: 0,
+          conversions: 0,
+        });
+      return adMap.get(id)!;
+    };
+    for (const r of imps) {
+      const a = r.campaignId ? campaignToAdv.get(r.campaignId) : null;
+      if (a) ensureAd(a.id, a.label).impressions += r._count._all;
+    }
+    for (const r of clks) {
+      const a = r.campaignId ? campaignToAdv.get(r.campaignId) : null;
+      if (a) ensureAd(a.id, a.label).clicks += r._count._all;
+    }
+    for (const r of convs) {
+      const a = r.campaignId ? campaignToAdv.get(r.campaignId) : null;
+      if (a) ensureAd(a.id, a.label).conversions += r._count._all;
+    }
+    const adOut = [...adMap.values()];
+    for (const row of adOut) row.ctr = ctr(row.impressions, row.clicks);
+    adOut.sort((a, b) => b.impressions - a.impressions);
+    return adOut;
+  }
+
   const groupKey =
     dim === "campaign"
       ? "campaignId"
