@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ROLES } from "@/lib/auth";
@@ -6,8 +7,10 @@ import {
   regenerateApiKey,
   createPlacement,
   setPlacementStatus,
+  deletePlacement,
 } from "../actions";
 import { readNewKey } from "@/lib/platform-key-flash";
+import { DeleteButton } from "@/components/DeleteButton";
 import { Field, TextArea, Select, enumOptions } from "@/components/form";
 
 export const dynamic = "force-dynamic";
@@ -125,19 +128,32 @@ export default async function PlatformDetailPage({
                     <td className="td">
                       <Badge value={pl.status} />
                     </td>
-                    <td className="td text-right">
-                      <form
-                        action={setPlacementStatus.bind(
-                          null,
-                          pl.id,
-                          p.id,
-                          next,
-                        )}
-                      >
-                        <button className="btn-secondary" type="submit">
-                          {next === "ACTIVE" ? "Activate" : "Deactivate"}
-                        </button>
-                      </form>
+                    <td className="td">
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <Link
+                          href={`/admin/platforms/${p.id}/placements/${pl.id}/edit`}
+                          className="btn-secondary"
+                        >
+                          Edit
+                        </Link>
+                        <form
+                          action={setPlacementStatus.bind(
+                            null,
+                            pl.id,
+                            p.id,
+                            next,
+                          )}
+                        >
+                          <button className="btn-secondary" type="submit">
+                            {next === "ACTIVE" ? "Activate" : "Deactivate"}
+                          </button>
+                        </form>
+                        <DeleteButton
+                          action={deletePlacement.bind(null, pl.id, p.id)}
+                          label="Delete"
+                          confirmText={`Permanently delete placement "${pl.name}" (${pl.placementKey})? This unassigns it from all campaigns and removes its impressions / clicks. This cannot be undone.`}
+                        />
+                      </div>
                     </td>
                   </tr>
                 );

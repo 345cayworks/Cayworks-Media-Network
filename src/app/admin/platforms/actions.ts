@@ -103,3 +103,50 @@ export async function setPlacementStatus(
   await audit(user, `PLACEMENT_${status}`, "AdPlacement", placementId);
   revalidatePath(`/admin/platforms/${platformId}`);
 }
+
+export async function updatePlacement(
+  placementId: string,
+  platformId: string,
+  formData: FormData,
+) {
+  const user = await requireRole(ADMIN_ROLES);
+  const raw = { ...Object.fromEntries(formData), platformId };
+  const parsed = placementSchema.safeParse(raw);
+  if (!parsed.success) {
+    redirect(
+      `/admin/platforms/${platformId}/placements/${placementId}/edit?error=${encodeURIComponent(parsed.error.errors[0].message)}`,
+    );
+  }
+  await prisma.adPlacement.update({
+    where: { id: placementId },
+    data: {
+      placementKey: parsed.data.placementKey,
+      name: parsed.data.name,
+      description: parsed.data.description,
+      placementType: parsed.data.placementType,
+      status: parsed.data.status,
+      allowedSizes: parsed.data.allowedSizes,
+    },
+  });
+  await audit(user, "UPDATE", "AdPlacement", placementId);
+  revalidatePath(`/admin/platforms/${platformId}`);
+  redirect(`/admin/platforms/${platformId}`);
+}
+
+export async function deletePlacement(
+  placementId: string,
+  platformId: string,
+) {
+  // Cascades to CampaignPlacement links + impressions/clicks/conversions
+  // on this placement (see schema onDelete: Cascade).
+  const user = await requireRole(ADMIN_ROLES);
+  const p = await prisma.adPlacement.findUnique({
+    where: { id: placementId },
+    select: { placementKey: true },
+  });
+  await prisma.adPlacement.delete({ where: { id: placementId } });
+  await audit(user, "DELETE", "AdPlacement", placementId, {
+    placementKey: p?.placementKey,
+  });
+  revalidatePath(`/admin/platforms/${platformId}`);
+}
