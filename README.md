@@ -140,6 +140,21 @@ curl "https://ads.cayworks.com/api/ads/serve?platform=cayrentmanager&placement=l
   -H "X-Ad-Engine-Key: cae_live_..."
 ```
 
+### Skyscraper placement type + dimension-fit selection
+
+`PlacementType.SKYSCRAPER` (180x600) is selectable on any placement
+alongside `BANNER`, `SIDEBAR`, `CARD`, `NATIVE`, `VIDEO`. Selection now
+**prefers creatives whose dimensions match the placement** (within ±15%):
+
+- Uses the placement's `allowedSizes` if set (e.g. `180x600, 160x600`),
+  otherwise the type's defaults — `SKYSCRAPER → 180x600`,
+  `BANNER → 728x90 / 970x90 / 300x250`, `SIDEBAR → 300x600 / 300x250`,
+  `CARD → 300x250`.
+- Best-fit creatives are picked first; if none match, the slot still
+  serves an eligible creative rather than going dark.
+- A new `<SkyscraperAd>` plugin preset renders a 180x600 unit fluidly
+  (aspectRatio 180/600, 180px max width).
+
 ### Responsive sizing
 
 Slots are **fluid by default** — the wrapper fills 100% of its container, so

@@ -52,6 +52,7 @@ enum PlacementType {
   CARD
   NATIVE
   VIDEO
+  SKYSCRAPER
 }
 
 enum CampaignStatus {

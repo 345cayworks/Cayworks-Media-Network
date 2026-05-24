@@ -161,7 +161,14 @@ export default async function PlatformDetailPage({
         <Select
           label="Type"
           name="placementType"
-          options={enumOptions(["BANNER", "SIDEBAR", "CARD", "NATIVE", "VIDEO"])}
+          options={enumOptions([
+            "BANNER",
+            "SIDEBAR",
+            "CARD",
+            "NATIVE",
+            "VIDEO",
+            "SKYSCRAPER",
+          ])}
         />
         <Select
           label="Status"

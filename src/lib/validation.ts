@@ -46,7 +46,7 @@ export const placementSchema = z.object({
     .regex(/^[a-z0-9_]+$/, "Lowercase letters, numbers and underscores only"),
   name: z.string().trim().min(1),
   description: optionalString,
-  placementType: z.enum(["BANNER", "SIDEBAR", "CARD", "NATIVE", "VIDEO"]),
+  placementType: z.enum(["BANNER", "SIDEBAR", "CARD", "NATIVE", "VIDEO", "SKYSCRAPER"]),
   status: z.enum(["ACTIVE", "INACTIVE"]),
   allowedSizes: z
     .string()

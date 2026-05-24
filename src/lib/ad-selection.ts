@@ -40,6 +40,69 @@ function startOfUtcDay(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
+// Default expected dimensions per placement type, used when the placement
+// itself doesn't list any allowedSizes. Tuned to standard IAB sizes.
+const TYPE_DEFAULT_SIZES: Record<string, { w: number; h: number }[]> = {
+  SKYSCRAPER: [{ w: 180, h: 600 }],
+  BANNER: [
+    { w: 728, h: 90 },
+    { w: 970, h: 90 },
+    { w: 300, h: 250 },
+  ],
+  SIDEBAR: [
+    { w: 300, h: 600 },
+    { w: 300, h: 250 },
+  ],
+  CARD: [{ w: 300, h: 250 }],
+  // NATIVE/VIDEO are not dimension-gated.
+};
+
+function parseSize(s: string): { w: number; h: number } | null {
+  const m = s.trim().match(/^(\d+)\s*x\s*(\d+)$/i);
+  if (!m) return null;
+  return { w: parseInt(m[1], 10), h: parseInt(m[2], 10) };
+}
+
+function placementSizes(
+  allowedSizes: string[],
+  placementType: string,
+): { w: number; h: number }[] {
+  if (allowedSizes.length > 0) {
+    return allowedSizes
+      .map(parseSize)
+      .filter((s): s is { w: number; h: number } => s != null);
+  }
+  return TYPE_DEFAULT_SIZES[placementType] ?? [];
+}
+
+// A creative "fits" a target size if both dimensions are within ±15% — close
+// enough that fluid sizing + object-fit will display it cleanly.
+function fitsSize(
+  cw: number,
+  ch: number,
+  s: { w: number; h: number },
+  tolerance = 0.15,
+): boolean {
+  return (
+    Math.abs(cw - s.w) / s.w <= tolerance &&
+    Math.abs(ch - s.h) / s.h <= tolerance
+  );
+}
+
+function filterBestCreatives<T extends { width: number | null; height: number | null }>(
+  creatives: T[],
+  sizes: { w: number; h: number }[],
+): T[] {
+  if (sizes.length === 0) return creatives;
+  const matched = creatives.filter((c) => {
+    if (!c.width || !c.height) return false;
+    return sizes.some((s) => fitsSize(c.width!, c.height!, s));
+  });
+  // Prefer best-fit creatives; fall back to all so the slot still serves
+  // something rather than going dark when nothing matches the placement.
+  return matched.length > 0 ? matched : creatives;
+}
+
 const CAMPAIGN_LINK_INCLUDE = {
   campaign: {
     include: {
@@ -53,7 +116,13 @@ type CampaignLink = Prisma.CampaignPlacementGetPayload<{
   include: typeof CAMPAIGN_LINK_INCLUDE;
 }>;
 type Creative = CampaignLink["campaign"]["creatives"][number];
-type Candidate = { link: CampaignLink; weight: number };
+type Candidate = {
+  link: CampaignLink;
+  weight: number;
+  /** Approved creatives filtered to those that fit the placement's expected
+   * dimensions. Falls back to all approved creatives when nothing matches. */
+  bestCreatives: Creative[];
+};
 
 /**
  * Resolve the active placement and the eligible campaigns linked to it:
@@ -74,6 +143,8 @@ async function gatherCandidates(
     },
   });
   if (!placement) return null;
+
+  const sizes = placementSizes(placement.allowedSizes, placement.placementType);
 
   const links = await prisma.campaignPlacement.findMany({
     where: {
@@ -137,7 +208,8 @@ async function gatherCandidates(
     }
 
     const weight = Math.max(1, campaign.priority) * Math.max(1, link.weight);
-    candidates.push({ link, weight });
+    const bestCreatives = filterBestCreatives(campaign.creatives, sizes);
+    candidates.push({ link, weight, bestCreatives });
   }
 
   return { placementId: placement.id, candidates };
@@ -208,7 +280,7 @@ export async function selectAd(
     }
   }
 
-  const creatives = chosen.link.campaign.creatives;
+  const creatives = chosen.bestCreatives;
   const creative = creatives[Math.floor(Math.random() * creatives.length)];
   return buildPayload(chosen.link, creative, g.placementId, params.platformId);
 }
@@ -230,7 +302,7 @@ export async function selectAdQueue(
 
   const pool = applyCategory(g.candidates, params.category);
   const distinctCombos = pool.reduce(
-    (sum, c) => sum + c.link.campaign.creatives.length,
+    (sum, c) => sum + c.bestCreatives.length,
     0,
   );
   // No point repeating a single image; otherwise honor the requested length
@@ -248,7 +320,7 @@ export async function selectAdQueue(
       if (s.cw > best.cw) best = s;
     }
     best.cw -= totalW;
-    const creatives = best.c.link.campaign.creatives;
+    const creatives = best.c.bestCreatives;
     const creative = creatives[best.ci % creatives.length];
     best.ci++;
     out.push(

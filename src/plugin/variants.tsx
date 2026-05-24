@@ -23,3 +23,23 @@ export function NativeAd(props: PresetProps) {
 export function VideoAd(props: PresetProps) {
   return <AdSlot {...props} variant="video" />;
 }
+
+/**
+ * Tall vertical skyscraper unit (180x600). Defaults to a 180/600 aspect ratio
+ * and 180px max width so the creative keeps its skyscraper shape but still
+ * scales fluidly within smaller containers.
+ */
+export function SkyscraperAd({
+  aspectRatio = "180/600",
+  maxWidth = 180,
+  ...rest
+}: PresetProps) {
+  return (
+    <AdSlot
+      {...rest}
+      variant="banner"
+      aspectRatio={aspectRatio}
+      maxWidth={maxWidth}
+    />
+  );
+}
