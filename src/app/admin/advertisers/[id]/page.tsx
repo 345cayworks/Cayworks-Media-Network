@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
-import { setAdvertiserStatus } from "../actions";
+import { setAdvertiserStatus, deleteAdvertiser } from "../actions";
+import { DeleteButton } from "@/components/DeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,11 @@ export default async function AdvertiserDetailPage({
                 {nextStatus === "ACTIVE" ? "Activate" : "Deactivate"}
               </button>
             </form>
+            <DeleteButton
+              action={deleteAdvertiser.bind(null, a.id)}
+              label="Delete"
+              confirmText={`Permanently delete ${a.businessName}? This also deletes all of its campaigns, creatives, and tracking data. This cannot be undone.`}
+            />
           </div>
         }
       />

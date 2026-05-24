@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getSessionUser, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, Badge, LinkButton } from "@/components/ui";
-import { setApproval } from "../actions";
+import { setApproval, deleteCreative } from "../actions";
 import { resolveVideo } from "@/lib/media";
+import { DeleteButton } from "@/components/DeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,11 @@ export default async function CreativeDetailPage({
                     Reject
                   </button>
                 </form>
+                <DeleteButton
+                  action={deleteCreative.bind(null, cr.id)}
+                  label="Delete"
+                  confirmText={`Permanently delete creative "${cr.title}"? Impressions and clicks for this creative will also be removed. This cannot be undone.`}
+                />
               </>
             )}
           </div>

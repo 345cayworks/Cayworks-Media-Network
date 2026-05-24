@@ -38,6 +38,21 @@ export async function updateCreative(id: string, formData: FormData) {
   redirect(`/admin/creatives/${id}`);
 }
 
+export async function deleteCreative(id: string) {
+  // Cascades to impressions/clicks for this creative (per schema). For a
+  // routine pause set status=INACTIVE in the edit form instead.
+  const user = await requireRole(ADMIN_ROLES);
+  const cr = await prisma.creative.findUnique({
+    where: { id },
+    select: { title: true, campaignId: true },
+  });
+  await prisma.creative.delete({ where: { id } });
+  await audit(user, "DELETE", "Creative", id, { title: cr?.title });
+  revalidatePath("/admin/creatives");
+  if (cr?.campaignId) revalidatePath(`/admin/campaigns/${cr.campaignId}`);
+  redirect(cr?.campaignId ? `/admin/campaigns/${cr.campaignId}` : "/admin/creatives");
+}
+
 export async function setApproval(
   id: string,
   approvalStatus: "APPROVED" | "REJECTED" | "PENDING",

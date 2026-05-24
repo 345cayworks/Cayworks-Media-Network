@@ -42,3 +42,18 @@ export async function setAdvertiserStatus(id: string, status: "ACTIVE" | "INACTI
   revalidatePath("/admin/advertisers");
   revalidatePath(`/admin/advertisers/${id}`);
 }
+
+export async function deleteAdvertiser(id: string) {
+  // Hard delete cascades campaigns → creatives → impressions/clicks/etc.
+  // (See schema onDelete: Cascade). Prefer deactivate for routine pauses;
+  // this is for permanent removal.
+  const user = await requireRole(ADMIN_ROLES);
+  const a = await prisma.advertiser.findUnique({
+    where: { id },
+    select: { businessName: true },
+  });
+  await prisma.advertiser.delete({ where: { id } });
+  await audit(user, "DELETE", "Advertiser", id, { name: a?.businessName });
+  revalidatePath("/admin/advertisers");
+  redirect("/admin/advertisers");
+}

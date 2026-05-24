@@ -66,6 +66,21 @@ export async function assignPlacement(campaignId: string, formData: FormData) {
   revalidatePath(`/admin/campaigns/${campaignId}`);
 }
 
+export async function deleteCampaign(id: string) {
+  // Cascades to creatives, campaignPlacements, impressions/clicks/conversions,
+  // and any invoice linkage. For routine pauses, use setCampaignStatus instead.
+  const user = await requireRole(ADMIN_ROLES);
+  const c = await prisma.campaign.findUnique({
+    where: { id },
+    select: { name: true, advertiserId: true },
+  });
+  await prisma.campaign.delete({ where: { id } });
+  await audit(user, "DELETE", "Campaign", id, { name: c?.name });
+  revalidatePath("/admin/campaigns");
+  if (c?.advertiserId) revalidatePath(`/admin/advertisers/${c.advertiserId}`);
+  redirect("/admin/campaigns");
+}
+
 export async function removePlacement(campaignId: string, placementId: string) {
   const user = await requireRole(STAFF_ROLES);
   await prisma.campaignPlacement.deleteMany({

@@ -7,7 +7,9 @@ import {
   setCampaignStatus,
   assignPlacement,
   removePlacement,
+  deleteCampaign,
 } from "../actions";
+import { DeleteButton } from "@/components/DeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +72,11 @@ export default async function CampaignDetailPage({
                 </button>
               </form>
             ))}
+            <DeleteButton
+              action={deleteCampaign.bind(null, c.id)}
+              label="Delete"
+              confirmText={`Permanently delete campaign "${c.name}"? This also deletes its creatives, placement assignments, and tracking data. This cannot be undone.`}
+            />
           </div>
         }
       />
