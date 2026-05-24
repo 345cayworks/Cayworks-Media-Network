@@ -11,6 +11,7 @@ import {
   cloneCampaign,
 } from "../actions";
 import { DeleteButton } from "@/components/DeleteButton";
+import { deleteCreative } from "@/app/admin/creatives/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -132,6 +133,7 @@ export default async function CampaignDetailPage({
                 <th className="th">Type</th>
                 <th className="th">Approval</th>
                 <th className="th">Status</th>
+                <th className="th"></th>
               </tr>
             </thead>
             <tbody>
@@ -151,6 +153,13 @@ export default async function CampaignDetailPage({
                   </td>
                   <td className="td">
                     <Badge value={cr.status} />
+                  </td>
+                  <td className="td text-right">
+                    <DeleteButton
+                      action={deleteCreative.bind(null, cr.id)}
+                      label="Remove"
+                      confirmText={`Remove creative "${cr.title}" from this campaign? It will be deleted along with its impressions and clicks. This cannot be undone.`}
+                    />
                   </td>
                 </tr>
               ))}
