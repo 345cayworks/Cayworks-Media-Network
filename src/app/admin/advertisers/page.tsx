@@ -1,16 +1,109 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdvertisersPage() {
+type SortKey = "business" | "contact" | "industry" | "status" | "created";
+type Dir = "asc" | "desc";
+
+const SORTABLE: ReadonlySet<SortKey> = new Set([
+  "business",
+  "contact",
+  "industry",
+  "status",
+  "created",
+]);
+
+function orderByFor(sort: SortKey, dir: Dir): Prisma.AdvertiserOrderByWithRelationInput {
+  switch (sort) {
+    case "business":
+      return { businessName: dir };
+    case "contact":
+      return { contactName: dir };
+    case "industry":
+      return { industry: dir };
+    case "status":
+      return { status: dir };
+    default:
+      return { createdAt: dir };
+  }
+}
+
+function SortHeader({
+  label,
+  k,
+  current,
+  dir,
+}: {
+  label: string;
+  k: SortKey;
+  current: SortKey;
+  dir: Dir;
+}) {
+  const active = current === k;
+  const nextDir: Dir = active && dir === "asc" ? "desc" : "asc";
+  const arrow = active ? (dir === "asc" ? "▲" : "▼") : "";
+  return (
+    <th className="th">
+      <Link
+        href={`/admin/advertisers?sort=${k}&dir=${nextDir}`}
+        className={
+          active
+            ? "inline-flex items-center gap-1 text-brand-600"
+            : "inline-flex items-center gap-1 hover:text-slate-700"
+        }
+      >
+        {label}
+        <span className="text-[10px]">{arrow}</span>
+      </Link>
+    </th>
+  );
+}
+
+export default async function AdvertisersPage({
+  searchParams,
+}: {
+  searchParams: { sort?: string; dir?: string };
+}) {
   await requireUser();
+
+  const sort: SortKey = SORTABLE.has(searchParams.sort as SortKey)
+    ? (searchParams.sort as SortKey)
+    : "created";
+  const dir: Dir = searchParams.dir === "asc" ? "asc" : "desc";
+
   const advertisers = await prisma.advertiser.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: orderByFor(sort, dir),
     include: { _count: { select: { campaigns: true } } },
   });
+
+  // Roll impressions/clicks up from campaigns → advertiser. groupBy on
+  // tracking tables by campaignId, then map to advertiserId.
+  const [imps, clks, campaigns] = await Promise.all([
+    prisma.adImpression.groupBy({
+      by: ["campaignId"],
+      _count: { _all: true },
+    }),
+    prisma.adClick.groupBy({
+      by: ["campaignId"],
+      _count: { _all: true },
+    }),
+    prisma.campaign.findMany({ select: { id: true, advertiserId: true } }),
+  ]);
+  const campToAdv = new Map(campaigns.map((c) => [c.id, c.advertiserId]));
+  const impByAdv = new Map<string, number>();
+  const clkByAdv = new Map<string, number>();
+  for (const r of imps) {
+    const advId = r.campaignId ? campToAdv.get(r.campaignId) : null;
+    if (advId) impByAdv.set(advId, (impByAdv.get(advId) ?? 0) + r._count._all);
+  }
+  for (const r of clks) {
+    const advId = r.campaignId ? campToAdv.get(r.campaignId) : null;
+    if (advId) clkByAdv.set(advId, (clkByAdv.get(advId) ?? 0) + r._count._all);
+  }
 
   return (
     <div>
@@ -28,16 +121,21 @@ export default async function AdvertisersPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">Business</th>
-                <th className="th">Contact</th>
-                <th className="th">Industry</th>
+                <SortHeader label="Business" k="business" current={sort} dir={dir} />
+                <SortHeader label="Contact" k="contact" current={sort} dir={dir} />
+                <SortHeader label="Industry" k="industry" current={sort} dir={dir} />
                 <th className="th">Campaigns</th>
+                <th className="th text-right">Impressions</th>
+                <th className="th text-right">Clicks</th>
                 <th className="th">Billing</th>
-                <th className="th">Status</th>
+                <SortHeader label="Status" k="status" current={sort} dir={dir} />
               </tr>
             </thead>
             <tbody>
-              {advertisers.map((a) => (
+              {advertisers.map((a) => {
+                const impressions = impByAdv.get(a.id) ?? 0;
+                const clicks = clkByAdv.get(a.id) ?? 0;
+                return (
                 <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50">
                   <td className="td font-medium">
                     <Link
@@ -53,6 +151,12 @@ export default async function AdvertisersPage() {
                   </td>
                   <td className="td">{a.industry ?? "—"}</td>
                   <td className="td">{a._count.campaigns}</td>
+                  <td className="td text-right tabular-nums">
+                    {impressions.toLocaleString()}
+                  </td>
+                  <td className="td text-right tabular-nums">
+                    {clicks.toLocaleString()}
+                  </td>
                   <td className="td">
                     <Badge value={a.billingStatus} />
                   </td>
@@ -60,7 +164,8 @@ export default async function AdvertisersPage() {
                     <Badge value={a.status} />
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
