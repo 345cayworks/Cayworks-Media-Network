@@ -82,8 +82,10 @@ export async function deleteCampaign(id: string) {
 }
 
 export async function cloneCampaign(id: string) {
-  // Duplicate the campaign (DRAFT), its creatives, and its placement
-  // assignments (PAUSED, so they don't start serving until reviewed).
+  // Duplicate the campaign (DRAFT) plus its creatives and placement
+  // assignments. Link statuses are copied from the source — the cloned
+  // campaign itself is DRAFT, so selection won't serve from it until an
+  // admin activates the campaign.
   const user = await requireRole(STAFF_ROLES);
   const src = await prisma.campaign.findUnique({
     where: { id },
@@ -132,7 +134,7 @@ export async function cloneCampaign(id: string) {
         data: src.campaignPlacements.map((cp) => ({
           campaignId: c.id,
           placementId: cp.placementId,
-          status: "PAUSED",
+          status: cp.status,
           weight: cp.weight,
         })),
       });
@@ -143,6 +145,22 @@ export async function cloneCampaign(id: string) {
   await audit(user, "CLONE", "Campaign", cloned.id, { sourceId: id });
   revalidatePath("/admin/campaigns");
   redirect(`/admin/campaigns/${cloned.id}`);
+}
+
+export async function setCampaignPlacementStatus(
+  campaignId: string,
+  placementId: string,
+  status: "ACTIVE" | "PAUSED",
+) {
+  const user = await requireRole(STAFF_ROLES);
+  await prisma.campaignPlacement.update({
+    where: { campaignId_placementId: { campaignId, placementId } },
+    data: { status },
+  });
+  await audit(user, `LINK_${status}`, "CampaignPlacement", campaignId, {
+    placementId,
+  });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
 }
 
 export async function removePlacement(campaignId: string, placementId: string) {

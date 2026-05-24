@@ -9,6 +9,7 @@ import {
   removePlacement,
   deleteCampaign,
   cloneCampaign,
+  setCampaignPlacementStatus,
 } from "../actions";
 import { DeleteButton } from "@/components/DeleteButton";
 import { deleteCreative } from "@/app/admin/creatives/actions";
@@ -203,17 +204,31 @@ export default async function CampaignDetailPage({
                     <Badge value={cp.status} />
                   </td>
                   <td className="td text-right">
-                    <form
-                      action={removePlacement.bind(
-                        null,
-                        c.id,
-                        cp.placementId,
-                      )}
-                    >
-                      <button className="btn-danger" type="submit">
-                        Remove
-                      </button>
-                    </form>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      <form
+                        action={setCampaignPlacementStatus.bind(
+                          null,
+                          c.id,
+                          cp.placementId,
+                          cp.status === "ACTIVE" ? "PAUSED" : "ACTIVE",
+                        )}
+                      >
+                        <button className="btn-secondary" type="submit">
+                          {cp.status === "ACTIVE" ? "Pause" : "Reactivate"}
+                        </button>
+                      </form>
+                      <form
+                        action={removePlacement.bind(
+                          null,
+                          c.id,
+                          cp.placementId,
+                        )}
+                      >
+                        <button className="btn-danger" type="submit">
+                          Remove
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}
