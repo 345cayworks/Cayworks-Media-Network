@@ -8,6 +8,7 @@ import {
   assignPlacement,
   removePlacement,
   deleteCampaign,
+  cloneCampaign,
 } from "../actions";
 import { DeleteButton } from "@/components/DeleteButton";
 
@@ -57,6 +58,11 @@ export default async function CampaignDetailPage({
             >
               Edit
             </LinkButton>
+            <form action={cloneCampaign.bind(null, c.id)}>
+              <button type="submit" className="btn-secondary">
+                Clone
+              </button>
+            </form>
             {(["ACTIVE", "PAUSED", "ENDED"] as const).map((s) => (
               <form key={s} action={setCampaignStatus.bind(null, c.id, s)}>
                 <button

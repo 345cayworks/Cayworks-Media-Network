@@ -53,6 +53,46 @@ export async function deleteCreative(id: string) {
   redirect(cr?.campaignId ? `/admin/campaigns/${cr.campaignId}` : "/admin/creatives");
 }
 
+export async function cloneCreative(
+  sourceId: string,
+  targetCampaignId: string,
+) {
+  // Reuse already-uploaded media (image/video URLs are shared — no
+  // re-upload) by duplicating an existing creative into another campaign.
+  // Lands the operator on the new creative's edit page to tweak per-campaign
+  // copy/CTA. Re-set to PENDING so the new campaign's review still runs.
+  const user = await requireRole(STAFF_ROLES);
+  if (!sourceId || !targetCampaignId) {
+    redirect("/admin/creatives?error=Missing+source+or+target");
+  }
+  const src = await prisma.creative.findUnique({ where: { id: sourceId } });
+  if (!src) redirect("/admin/creatives?error=Source+creative+not+found");
+
+  const cloned = await prisma.creative.create({
+    data: {
+      campaignId: targetCampaignId,
+      title: src.title,
+      description: src.description,
+      imageUrl: src.imageUrl,
+      videoUrl: src.videoUrl,
+      destinationUrl: src.destinationUrl,
+      ctaText: src.ctaText,
+      creativeType: src.creativeType,
+      width: src.width,
+      height: src.height,
+      approvalStatus: "PENDING",
+      status: "ACTIVE",
+    },
+  });
+  await audit(user, "CLONE", "Creative", cloned.id, {
+    sourceId,
+    targetCampaignId,
+  });
+  revalidatePath("/admin/creatives");
+  revalidatePath(`/admin/campaigns/${targetCampaignId}`);
+  redirect(`/admin/creatives/${cloned.id}/edit`);
+}
+
 export async function setApproval(
   id: string,
   approvalStatus: "APPROVED" | "REJECTED" | "PENDING",

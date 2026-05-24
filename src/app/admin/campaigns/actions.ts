@@ -81,6 +81,70 @@ export async function deleteCampaign(id: string) {
   redirect("/admin/campaigns");
 }
 
+export async function cloneCampaign(id: string) {
+  // Duplicate the campaign (DRAFT), its creatives, and its placement
+  // assignments (PAUSED, so they don't start serving until reviewed).
+  const user = await requireRole(STAFF_ROLES);
+  const src = await prisma.campaign.findUnique({
+    where: { id },
+    include: { creatives: true, campaignPlacements: true },
+  });
+  if (!src) redirect("/admin/campaigns");
+
+  const cloned = await prisma.$transaction(async (tx) => {
+    const c = await tx.campaign.create({
+      data: {
+        advertiserId: src.advertiserId,
+        name: `${src.name} (Copy)`,
+        objective: src.objective,
+        startDate: src.startDate,
+        endDate: src.endDate,
+        budget: src.budget,
+        pricingModel: src.pricingModel,
+        status: "DRAFT",
+        priority: src.priority,
+        dailyImpressionLimit: src.dailyImpressionLimit,
+        totalImpressionLimit: src.totalImpressionLimit,
+        frequencyCapPerUserPerHour: src.frequencyCapPerUserPerHour,
+        frequencyCapPerUserPerDay: src.frequencyCapPerUserPerDay,
+      },
+    });
+    if (src.creatives.length > 0) {
+      await tx.creative.createMany({
+        data: src.creatives.map((cr) => ({
+          campaignId: c.id,
+          title: cr.title,
+          description: cr.description,
+          imageUrl: cr.imageUrl,
+          videoUrl: cr.videoUrl,
+          destinationUrl: cr.destinationUrl,
+          ctaText: cr.ctaText,
+          creativeType: cr.creativeType,
+          width: cr.width,
+          height: cr.height,
+          approvalStatus: cr.approvalStatus,
+          status: cr.status,
+        })),
+      });
+    }
+    if (src.campaignPlacements.length > 0) {
+      await tx.campaignPlacement.createMany({
+        data: src.campaignPlacements.map((cp) => ({
+          campaignId: c.id,
+          placementId: cp.placementId,
+          status: "PAUSED",
+          weight: cp.weight,
+        })),
+      });
+    }
+    return c;
+  });
+
+  await audit(user, "CLONE", "Campaign", cloned.id, { sourceId: id });
+  revalidatePath("/admin/campaigns");
+  redirect(`/admin/campaigns/${cloned.id}`);
+}
+
 export async function removePlacement(campaignId: string, placementId: string) {
   const user = await requireRole(STAFF_ROLES);
   await prisma.campaignPlacement.deleteMany({
