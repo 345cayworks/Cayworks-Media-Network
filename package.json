@@ -5,8 +5,9 @@
   "description": "Centralized advertising backend and reusable ad network plugin for Cayworks platforms.",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && next build",
     "postbuild": "tsx prisma/seed.ts || echo 'seed skipped (non-fatal)'",
+    "db:migrate:deploy": "prisma migrate deploy",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",

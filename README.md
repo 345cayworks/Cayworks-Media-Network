@@ -30,9 +30,20 @@ npm run dev                   # http://localhost:3000
 
 ### Deploying without local CLI access
 
-`npm run build` runs `prisma migrate deploy`, so **migrations apply
-automatically on every Netlify deploy** (set `DATABASE_URL` in the site
-env so it's present at build time).
+The Netlify build runs `prisma generate && next build` only. **Migrations
+are not applied during build** — pooled Neon/Supabase URLs (the kind you
+should use at runtime) can't hold the advisory lock Prisma needs for
+`migrate deploy`, which causes a `P1002` timeout. Apply migrations
+separately when the schema changes (one-time, against the **direct**
+database URL):
+
+```bash
+DATABASE_URL="postgresql://...@host/db?sslmode=require" \
+  npm run db:migrate:deploy
+```
+
+A redeploy after migrating picks up the new client. The post-build seed
+(superadmin + bundled platforms) still runs and is idempotent.
 
 To seed without the CLI, POST to the key-protected bootstrap endpoint once
 after the deploy is live:
