@@ -66,6 +66,44 @@ export async function assignPlacement(campaignId: string, formData: FormData) {
   revalidatePath(`/admin/campaigns/${campaignId}`);
 }
 
+export async function bulkSetCampaignStatus(
+  status: "ACTIVE" | "PAUSED" | "ENDED" | "DRAFT",
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("campaignId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/campaigns");
+    return;
+  }
+  await prisma.campaign.updateMany({
+    where: { id: { in: ids } },
+    data: { status },
+  });
+  await audit(user, `STATUS_BULK_${status}`, "Campaign", null, {
+    count: ids.length,
+  });
+  revalidatePath("/admin/campaigns");
+}
+
+export async function bulkDeleteCampaigns(formData: FormData) {
+  const user = await requireRole(ADMIN_ROLES);
+  const ids = formData
+    .getAll("campaignId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/campaigns");
+    return;
+  }
+  await prisma.campaign.deleteMany({ where: { id: { in: ids } } });
+  await audit(user, "DELETE_BULK", "Campaign", null, { count: ids.length });
+  revalidatePath("/admin/campaigns");
+}
+
 export async function deleteCampaign(id: string) {
   // Cascades to creatives, campaignPlacements, impressions/clicks/conversions,
   // and any invoice linkage. For routine pauses, use setCampaignStatus instead.

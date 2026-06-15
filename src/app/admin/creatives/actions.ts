@@ -138,6 +138,22 @@ export async function createAndAttachCreative(
   redirect(`/admin/campaigns/${campaignId}`);
 }
 
+export async function bulkDeleteCreatives(formData: FormData) {
+  const user = await requireRole(ADMIN_ROLES);
+  const ids = formData
+    .getAll("creativeId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/creatives");
+    return;
+  }
+  await prisma.creative.deleteMany({ where: { id: { in: ids } } });
+  await audit(user, "DELETE_BULK", "Creative", null, { count: ids.length });
+  revalidatePath("/admin/creatives");
+  revalidatePath("/admin/approvals");
+}
+
 /** Attach an existing creative to a campaign (idempotent, ACTIVE link). */
 export async function attachCreativeToCampaign(
   creativeId: string,

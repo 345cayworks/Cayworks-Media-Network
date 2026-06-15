@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, EmptyState, LinkButton } from "@/components/ui";
 import { StatusPill } from "@/components/StatusPill";
+import { ConfirmFormButton } from "@/components/ConfirmFormButton";
+import {
+  bulkSetCampaignStatus,
+  bulkDeleteCampaigns,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -111,10 +116,12 @@ export default async function CampaignsPage({
       {campaigns.length === 0 ? (
         <EmptyState message="No campaigns yet." />
       ) : (
+        <form action={bulkSetCampaignStatus.bind(null, "ACTIVE")}>
         <div className="card overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
+                <th className="th w-8"></th>
                 <SortHeader label="Campaign" k="name" current={sort} dir={dir} />
                 <SortHeader label="Advertiser" k="advertiser" current={sort} dir={dir} />
                 <SortHeader label="Flight" k="flight" current={sort} dir={dir} />
@@ -153,6 +160,14 @@ export default async function CampaignsPage({
                     key={c.id}
                     className="border-b border-slate-50 hover:bg-slate-50"
                   >
+                    <td className="td">
+                      <input
+                        type="checkbox"
+                        name="campaignId"
+                        value={c.id}
+                        className="h-3.5 w-3.5"
+                      />
+                    </td>
                     <td className="td font-medium">
                       <Link
                         href={`/admin/campaigns/${c.id}`}
@@ -210,6 +225,37 @@ export default async function CampaignsPage({
             </tbody>
           </table>
         </div>
+
+        <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
+          <span className="mr-auto text-xs text-slate-500">
+            Bulk actions apply to every ticked row.
+          </span>
+          <button type="submit" className="btn-secondary">
+            Activate
+          </button>
+          <button
+            type="submit"
+            formAction={bulkSetCampaignStatus.bind(null, "PAUSED")}
+            className="btn-secondary"
+          >
+            Pause
+          </button>
+          <button
+            type="submit"
+            formAction={bulkSetCampaignStatus.bind(null, "ENDED")}
+            className="btn-secondary"
+          >
+            End
+          </button>
+          <ConfirmFormButton
+            action={bulkDeleteCampaigns}
+            className="btn-danger"
+            confirmText="Permanently delete the selected campaigns? This also deletes their creatives' links, placement assignments, and tracking data. This cannot be undone."
+          >
+            Delete
+          </ConfirmFormButton>
+        </div>
+        </form>
       )}
     </div>
   );
