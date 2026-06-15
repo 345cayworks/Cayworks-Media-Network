@@ -21,7 +21,13 @@ const ENTITIES = [
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: { entity?: string; q?: string; actor?: string };
+  searchParams: {
+    entity?: string;
+    q?: string;
+    actor?: string;
+    from?: string;
+    to?: string;
+  };
 }) {
   await requireRole(ADMIN_ROLES);
 
@@ -34,6 +40,15 @@ export default async function AuditPage({
     where.actorEmail = { contains: actor, mode: "insensitive" };
   const q = (searchParams.q ?? "").trim();
   if (q) where.action = { contains: q, mode: "insensitive" };
+  const range: { gte?: Date; lte?: Date } = {};
+  if (searchParams.from && !Number.isNaN(Date.parse(searchParams.from)))
+    range.gte = new Date(searchParams.from);
+  if (searchParams.to && !Number.isNaN(Date.parse(searchParams.to))) {
+    const end = new Date(searchParams.to);
+    end.setUTCHours(23, 59, 59, 999);
+    range.lte = end;
+  }
+  if (Object.keys(range).length > 0) where.createdAt = range;
 
   const logs = await prisma.auditLog.findMany({
     where,
@@ -41,11 +56,24 @@ export default async function AuditPage({
     take: 200,
   });
 
+  const exportQs = new URLSearchParams();
+  for (const [k, v] of Object.entries(searchParams)) {
+    if (v) exportQs.set(k, String(v));
+  }
+
   return (
     <div>
       <PageHeader
         title="Audit Log"
         subtitle={`Showing the most recent ${logs.length} matching entries (max 200).`}
+        action={
+          <a
+            className="btn-primary"
+            href={`/api/admin/audit/export?${exportQs.toString()}`}
+          >
+            Export CSV
+          </a>
+        }
       />
 
       <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
@@ -88,10 +116,34 @@ export default async function AuditPage({
               className="input"
             />
           </div>
+          <div>
+            <label className="label" htmlFor="from">
+              From
+            </label>
+            <input
+              id="from"
+              name="from"
+              type="date"
+              defaultValue={searchParams.from}
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="to">
+              To
+            </label>
+            <input
+              id="to"
+              name="to"
+              type="date"
+              defaultValue={searchParams.to}
+              className="input"
+            />
+          </div>
           <button type="submit" className="btn-secondary">
             Apply
           </button>
-          {(q || actor) && (
+          {(q || actor || searchParams.from || searchParams.to) && (
             <Link
               href={
                 searchParams.entity

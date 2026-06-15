@@ -54,7 +54,7 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.AdvertiserOrderByWithRelati
 export default async function AdvertisersPage({
   searchParams,
 }: {
-  searchParams: { sort?: string; dir?: string };
+  searchParams: { sort?: string; dir?: string; q?: string };
 }) {
   await requireUser();
 
@@ -62,8 +62,18 @@ export default async function AdvertisersPage({
     ? (searchParams.sort as SortKey)
     : "created";
   const dir: Dir = searchParams.dir === "asc" ? "asc" : "desc";
+  const q = (searchParams.q ?? "").trim();
 
   const advertisersRaw = await prisma.advertiser.findMany({
+    where: q
+      ? {
+          OR: [
+            { businessName: { contains: q, mode: "insensitive" } },
+            { contactName: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {},
     orderBy: orderByFor(sort, dir),
     include: { _count: { select: { campaigns: true } } },
   });
@@ -118,6 +128,47 @@ export default async function AdvertisersPage({
           <LinkButton href="/admin/advertisers/new">New Advertiser</LinkButton>
         }
       />
+
+      <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
+        <form className="flex flex-1 min-w-[220px] items-end gap-2" method="get">
+          {searchParams.sort && (
+            <input type="hidden" name="sort" value={searchParams.sort} />
+          )}
+          {searchParams.dir && (
+            <input type="hidden" name="dir" value={searchParams.dir} />
+          )}
+          <div className="flex-1">
+            <label className="label" htmlFor="q">
+              Search
+            </label>
+            <input
+              id="q"
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="Business, contact or email…"
+              className="input"
+            />
+          </div>
+          <button type="submit" className="btn-secondary">
+            Search
+          </button>
+          {q && (
+            <Link
+              href={(() => {
+                const p = new URLSearchParams();
+                if (searchParams.sort) p.set("sort", searchParams.sort);
+                if (searchParams.dir) p.set("dir", searchParams.dir);
+                return p.toString() ? `/admin/advertisers?${p.toString()}` : "/admin/advertisers";
+              })()}
+              className="btn-secondary"
+            >
+              Clear
+            </Link>
+          )}
+        </form>
+      </div>
+
       {advertisers.length === 0 ? (
         <EmptyState message="No advertisers yet. Create your first advertiser." />
       ) : (

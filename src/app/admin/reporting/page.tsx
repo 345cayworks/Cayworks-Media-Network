@@ -70,6 +70,54 @@ export default async function ReportingPage({
           })}
         </div>
 
+        {/* Quick date-range presets — set from/to via a plain link.
+            Custom range still lives in the form just below. */}
+        {(() => {
+          const today = new Date();
+          const fmt = (d: Date) => d.toISOString().slice(0, 10);
+          const days = (n: number) => {
+            const d = new Date(today);
+            d.setUTCDate(d.getUTCDate() - n);
+            return d;
+          };
+          const monthStart = new Date(
+            Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1),
+          );
+          const presets: { label: string; from?: string; to?: string }[] = [
+            { label: "All time" },
+            { label: "Today", from: fmt(today), to: fmt(today) },
+            { label: "Last 7d", from: fmt(days(6)), to: fmt(today) },
+            { label: "Last 30d", from: fmt(days(29)), to: fmt(today) },
+            { label: "This month", from: fmt(monthStart), to: fmt(today) },
+          ];
+          return (
+            <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
+              {presets.map((p) => {
+                const params = new URLSearchParams();
+                params.set("groupBy", dim);
+                if (p.from) params.set("from", p.from);
+                if (p.to) params.set("to", p.to);
+                const active =
+                  (p.from ?? "") === (searchParams.from ?? "") &&
+                  (p.to ?? "") === (searchParams.to ?? "");
+                return (
+                  <Link
+                    key={p.label}
+                    href={`/admin/reporting?${params.toString()}`}
+                    className={
+                      active
+                        ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                        : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                    }
+                  >
+                    {p.label}
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         <form className="flex flex-wrap items-end gap-2" method="get">
           <input type="hidden" name="groupBy" value={dim} />
           <div>
