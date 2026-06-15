@@ -4,3 +4,9 @@ export { AdBanner, SponsoredCard, NativeAd, VideoAd, SkyscraperAd } from "./vari
 export { AdEngineTester } from "./AdEngineTester";
 export { resolveVideo } from "./client";
 export type { AdPayload, AdEngineConfig, ResolvedVideo } from "./client";
+export { syncPlacements } from "./sync";
+export type {
+  PlacementManifestEntry,
+  PlacementType,
+  SyncResult,
+} from "./sync";

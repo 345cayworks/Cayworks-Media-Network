@@ -39,6 +39,7 @@ export default async function PlatformsPage() {
                   <th className="th">Slug</th>
                   <th className="th">API Key</th>
                   <th className="th">Placements</th>
+                  <th className="th">Last sync</th>
                   <th className="th">Status</th>
                   <th className="th">Serving</th>
                 </tr>
@@ -69,6 +70,11 @@ export default async function PlatformsPage() {
                         {p.apiKeyPrefix || "—"}…
                       </td>
                       <td className="td">{p._count.placements}</td>
+                      <td className="td text-xs text-slate-500">
+                        {p.lastSyncedAt
+                          ? p.lastSyncedAt.toISOString().replace("T", " ").slice(0, 16)
+                          : "—"}
+                      </td>
                       <td className="td">
                         <Badge value={p.status} />
                       </td>

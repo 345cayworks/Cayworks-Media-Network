@@ -193,6 +193,42 @@ ads scale with the screen. Control the shape with optional props:
 Video defaults to 16/9 and also fills its width. The card thumbnail scales
 with the card and stays square.
 
+### Host-push placement sync
+
+Hosts can push their full placement manifest to keep the engine's
+`AdPlacement` rows in lockstep with the slots the app actually exposes
+— no manual entry per slot.
+
+```bash
+curl -X POST "https://<engine>/api/platforms/sync-placements" \
+  -H "X-Ad-Engine-Key: $AD_ENGINE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "asicayman",
+    "placements": [
+      {"key":"asi_dashboard_top","name":"Member Dashboard Top","type":"BANNER","allowedSizes":["728x90","970x90"]},
+      {"key":"asi_skyscraper","name":"Right Rail","type":"SKYSCRAPER","allowedSizes":["180x600"]}
+    ]
+  }'
+```
+
+Or via the plugin from a host's `postbuild`:
+
+```ts
+import { syncPlacements } from "@/ad-engine";
+await syncPlacements(
+  { engineUrl, apiKey, platform: "asicayman" },
+  [{ key: "asi_dashboard_top", name: "Member Dashboard Top", type: "BANNER", allowedSizes: ["728x90"] }],
+  { prune: true },
+);
+```
+
+The response lists `created`, `updated`, and `stale` placement keys
+(stale = exists on the engine but missing from this manifest). Pass
+`?prune=1` (or `{ prune: true }`) to automatically set stale placements
+to `INACTIVE`; otherwise stale is informational. The platform's
+**Last sync** timestamp is shown on `/admin/platforms`.
+
 ### Timed rotation
 
 Add `rotateSeconds` to any slot to cycle multiple ads on a timer:
