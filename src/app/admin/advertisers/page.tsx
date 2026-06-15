@@ -3,7 +3,8 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
-import { SelectAll } from "@/components/SelectAll";
+import { BulkToolbar } from "@/components/BulkToolbar";
+import { SortHeader } from "@/components/SortHeader";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import {
   bulkSetAdvertiserStatus,
@@ -48,47 +49,7 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.AdvertiserOrderByWithRelati
   }
 }
 
-function SortHeaderInline({
-  label,
-  k,
-  current,
-  dir,
-}: {
-  label: string;
-  k: SortKey;
-  current: SortKey;
-  dir: Dir;
-}) {
-  const active = current === k;
-  const nextDir: Dir = active && dir === "asc" ? "desc" : "asc";
-  const arrow = active ? (dir === "asc" ? "▲" : "▼") : "";
-  return (
-    <Link
-      href={`/admin/advertisers?sort=${k}&dir=${nextDir}`}
-      className={
-        active
-          ? "inline-flex items-center gap-1 text-brand-600"
-          : "inline-flex items-center gap-1 hover:text-slate-700"
-      }
-    >
-      {label}
-      <span className="text-[10px]">{arrow}</span>
-    </Link>
-  );
-}
-
-function SortHeader(props: {
-  label: string;
-  k: SortKey;
-  current: SortKey;
-  dir: Dir;
-}) {
-  return (
-    <th className="th">
-      <SortHeaderInline {...props} />
-    </th>
-  );
-}
+// SortHeader / SortHeaderInline live in @/components/SortHeader now.
 
 export default async function AdvertisersPage({
   searchParams,
@@ -166,28 +127,18 @@ export default async function AdvertisersPage({
             <thead>
               <tr className="border-b border-slate-200">
                 <th className="th w-8"></th>
-                <SortHeader label="Business" k="business" current={sort} dir={dir} />
-                <SortHeader label="Contact" k="contact" current={sort} dir={dir} />
-                <SortHeader label="Industry" k="industry" current={sort} dir={dir} />
+                <SortHeader label="Business" k="business" current={sort} dir={dir} basePath="/admin/advertisers" preserve={searchParams} />
+                <SortHeader label="Contact" k="contact" current={sort} dir={dir} basePath="/admin/advertisers" preserve={searchParams} />
+                <SortHeader label="Industry" k="industry" current={sort} dir={dir} basePath="/admin/advertisers" preserve={searchParams} />
                 <th className="th">Campaigns</th>
                 <th className="th text-right">
-                  <SortHeaderInline
-                    label="Impressions"
-                    k="impressions"
-                    current={sort}
-                    dir={dir}
-                  />
+                  <SortHeader inline label="Impressions" k="impressions" current={sort} dir={dir} basePath="/admin/advertisers" preserve={searchParams} />
                 </th>
                 <th className="th text-right">
-                  <SortHeaderInline
-                    label="Clicks"
-                    k="clicks"
-                    current={sort}
-                    dir={dir}
-                  />
+                  <SortHeader inline label="Clicks" k="clicks" current={sort} dir={dir} basePath="/admin/advertisers" preserve={searchParams} />
                 </th>
                 <th className="th">Billing</th>
-                <SortHeader label="Status" k="status" current={sort} dir={dir} />
+                <SortHeader label="Status" k="status" current={sort} dir={dir} basePath="/admin/advertisers" preserve={searchParams} />
               </tr>
             </thead>
             <tbody>
@@ -237,11 +188,7 @@ export default async function AdvertisersPage({
           </table>
         </div>
 
-        <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
-          <SelectAll name="advertiserId" />
-          <span className="mr-auto text-xs text-slate-500">
-            Bulk actions apply to every ticked row.
-          </span>
+        <BulkToolbar selectName="advertiserId">
           <button type="submit" className="btn-secondary">
             Activate
           </button>
@@ -259,7 +206,7 @@ export default async function AdvertisersPage({
           >
             Delete
           </ConfirmFormButton>
-        </div>
+        </BulkToolbar>
         </form>
       )}
     </div>

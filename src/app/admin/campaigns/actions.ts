@@ -52,20 +52,6 @@ export async function setCampaignStatus(
   revalidatePath("/admin/campaigns");
 }
 
-export async function assignPlacement(campaignId: string, formData: FormData) {
-  const user = await requireRole(STAFF_ROLES);
-  const placementId = String(formData.get("placementId") ?? "");
-  const weight = Math.max(1, Number(formData.get("weight") ?? 1));
-  if (!placementId) return;
-  await prisma.campaignPlacement.upsert({
-    where: { campaignId_placementId: { campaignId, placementId } },
-    create: { campaignId, placementId, weight, status: "ACTIVE" },
-    update: { weight, status: "ACTIVE" },
-  });
-  await audit(user, "ASSIGN_PLACEMENT", "Campaign", campaignId, { placementId });
-  revalidatePath(`/admin/campaigns/${campaignId}`);
-}
-
 export async function bulkSetCampaignStatus(
   status: "ACTIVE" | "PAUSED" | "ENDED" | "DRAFT",
   formData: FormData,

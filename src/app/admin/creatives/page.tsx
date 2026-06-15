@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
-import { SelectAll } from "@/components/SelectAll";
+import { BulkToolbar } from "@/components/BulkToolbar";
+import { FilterChips } from "@/components/FilterChips";
 import {
   bulkDeleteCreatives,
   bulkSetApproval,
@@ -132,34 +133,14 @@ export default async function CreativesPage({
           )}
         </form>
 
-        <div className="flex flex-col">
-          <span className="label">Type</span>
-          <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
-            <Link
-              href={withParam("type", undefined)}
-              className={
-                !searchParams.type
-                  ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-                  : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-              }
-            >
-              All
-            </Link>
-            {TYPE_FILTERS.map((t) => (
-              <Link
-                key={t}
-                href={withParam("type", t)}
-                className={
-                  searchParams.type === t
-                    ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-                    : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                }
-              >
-                {t}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <FilterChips
+          label="Type"
+          name="type"
+          basePath="/admin/creatives"
+          items={TYPE_FILTERS.map((t) => ({ value: t }))}
+          active={searchParams.type}
+          preserve={searchParams}
+        />
 
         <div className="flex flex-col">
           <span className="label">Sort</span>
@@ -187,34 +168,14 @@ export default async function CreativesPage({
           </form>
         </div>
 
-        <div className="flex flex-col">
-          <span className="label">Approval</span>
-          <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
-            <Link
-              href={withParam("approval", undefined)}
-              className={
-                !searchParams.approval
-                  ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-                  : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-              }
-            >
-              All
-            </Link>
-            {APPROVAL_FILTERS.map((a) => (
-              <Link
-                key={a}
-                href={withParam("approval", a)}
-                className={
-                  searchParams.approval === a
-                    ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-                    : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                }
-              >
-                {a}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <FilterChips
+          label="Approval"
+          name="approval"
+          basePath="/admin/creatives"
+          items={APPROVAL_FILTERS.map((a) => ({ value: a }))}
+          active={searchParams.approval}
+          preserve={searchParams}
+        />
       </div>
 
       {creatives.length === 0 ? (
@@ -282,11 +243,10 @@ export default async function CreativesPage({
             ))}
           </div>
 
-          <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
-            <SelectAll name="creativeId" />
-            <span className="mr-auto text-xs text-slate-500">
-              Bulk actions apply to every ticked card.
-            </span>
+          <BulkToolbar
+            selectName="creativeId"
+            hint="Bulk actions apply to every ticked card."
+          >
             <button type="submit" className="btn-primary">
               Approve selected
             </button>
@@ -304,7 +264,7 @@ export default async function CreativesPage({
             >
               Delete
             </ConfirmFormButton>
-          </div>
+          </BulkToolbar>
         </form>
       )}
     </div>

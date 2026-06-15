@@ -204,5 +204,3 @@ export async function setCampaignCreativeStatus(
   revalidatePath(`/admin/campaigns/${campaignId}`);
 }
 
-// Legacy alias retained so any older imports keep compiling.
-export const cloneCreative = attachCreativeToCampaign;

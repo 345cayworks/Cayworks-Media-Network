@@ -31,7 +31,6 @@ export default async function AdminLayout({
   return (
     <div className="min-h-screen">
       <HeaderBar
-        pendingApprovals={pendingApprovals}
         userEmail={user.email}
         signOutSlot={
           <form action={logoutAction}>

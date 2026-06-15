@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useCloudinaryUpload } from "@/lib/use-cloudinary-upload";
 
 type Props = {
   label: string;
@@ -10,9 +11,6 @@ type Props = {
   hint?: string;
 };
 
-const CLOUD = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? "";
-const PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? "";
-
 /**
  * URL field + direct file upload. If Cloudinary env is configured, picking a
  * file does an unsigned browser upload and writes the resulting secure URL
@@ -21,35 +19,15 @@ const PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? "";
  */
 export function MediaUpload({ label, name, kind, defaultValue, hint }: Props) {
   const [value, setValue] = useState(defaultValue ?? "");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const cloudinaryReady = CLOUD.length > 0 && PRESET.length > 0;
+  const { upload, busy, error, ready } = useCloudinaryUpload();
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("upload_preset", PRESET);
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD}/auto/upload`,
-        { method: "POST", body: fd },
-      );
-      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-      const json = (await res.json()) as { secure_url?: string };
-      if (!json.secure_url) throw new Error("No URL returned by Cloudinary");
-      setValue(json.secure_url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
+    const result = await upload(file);
+    if (result) setValue(result.url);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   return (
@@ -77,13 +55,13 @@ export function MediaUpload({ label, name, kind, defaultValue, hint }: Props) {
           type="file"
           accept={kind === "video" ? "video/*" : "image/*"}
           onChange={onPick}
-          disabled={!cloudinaryReady || busy}
+          disabled={!ready || busy}
           className="text-xs text-slate-500 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-medium"
         />
         {busy && <span className="text-xs text-slate-500">Uploading…</span>}
       </div>
 
-      {!cloudinaryReady && (
+      {!ready && (
         <p className="mt-1 text-xs text-amber-600">
           Direct upload disabled — set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and
           NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET to enable. You can still paste a

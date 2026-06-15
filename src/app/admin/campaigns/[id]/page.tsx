@@ -8,7 +8,6 @@ import { effectiveStatus } from "@/lib/campaign-status";
 import { diagnoseForPlatform } from "@/lib/ad-diagnose";
 import {
   setCampaignStatus,
-  assignPlacement,
   removePlacement,
   deleteCampaign,
   cloneCampaign,

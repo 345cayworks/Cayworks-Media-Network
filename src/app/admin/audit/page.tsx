@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, EmptyState } from "@/components/ui";
+import { FilterChips } from "@/components/FilterChips";
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +41,6 @@ export default async function AuditPage({
     take: 200,
   });
 
-  function chipClass(active: boolean): string {
-    return active
-      ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-      : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100";
-  }
-
   return (
     <div>
       <PageHeader
@@ -54,23 +49,14 @@ export default async function AuditPage({
       />
 
       <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
-        <div className="flex items-end gap-2">
-          <span className="label">Entity</span>
-          <div className="flex flex-wrap gap-1 rounded-md border border-slate-200 bg-white p-1">
-            <Link href="/admin/audit" className={chipClass(!searchParams.entity)}>
-              All
-            </Link>
-            {ENTITIES.map((e) => (
-              <Link
-                key={e}
-                href={`/admin/audit?entity=${e}`}
-                className={chipClass(searchParams.entity === e)}
-              >
-                {e}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <FilterChips
+          label="Entity"
+          name="entity"
+          basePath="/admin/audit"
+          items={ENTITIES.map((e) => ({ value: e }))}
+          active={searchParams.entity}
+          preserve={searchParams}
+        />
 
         <form className="flex flex-1 min-w-[260px] items-end gap-2" method="get">
           {searchParams.entity && (

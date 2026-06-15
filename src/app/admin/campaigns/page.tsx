@@ -5,7 +5,9 @@ import { requireUser } from "@/lib/auth";
 import { PageHeader, EmptyState, LinkButton } from "@/components/ui";
 import { StatusPill } from "@/components/StatusPill";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
-import { SelectAll } from "@/components/SelectAll";
+import { BulkToolbar } from "@/components/BulkToolbar";
+import { SortHeader } from "@/components/SortHeader";
+import { FilterChips } from "@/components/FilterChips";
 import {
   bulkSetCampaignStatus,
   bulkDeleteCampaigns,
@@ -53,37 +55,6 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.CampaignOrderByWithRelation
     default:
       return { createdAt: dir };
   }
-}
-
-function SortHeader({
-  label,
-  k,
-  current,
-  dir,
-}: {
-  label: string;
-  k: SortKey;
-  current: SortKey;
-  dir: Dir;
-}) {
-  const active = current === k;
-  const nextDir: Dir = active && dir === "asc" ? "desc" : "asc";
-  const arrow = active ? (dir === "asc" ? "▲" : "▼") : "";
-  return (
-    <th className="th">
-      <Link
-        href={`/admin/campaigns?sort=${k}&dir=${nextDir}`}
-        className={
-          active
-            ? "inline-flex items-center gap-1 text-brand-600"
-            : "inline-flex items-center gap-1 hover:text-slate-700"
-        }
-      >
-        {label}
-        <span className="text-[10px]">{arrow}</span>
-      </Link>
-    </th>
-  );
 }
 
 export default async function CampaignsPage({
@@ -139,45 +110,14 @@ export default async function CampaignsPage({
         action={<LinkButton href="/admin/campaigns/new">New Campaign</LinkButton>}
       />
       <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
-        <div className="flex items-end gap-2">
-          <span className="label">State</span>
-          <div className="flex flex-wrap gap-1 rounded-md border border-slate-200 bg-white p-1">
-            <Link
-              href={(() => {
-                const p = new URLSearchParams();
-                if (searchParams.sort) p.set("sort", searchParams.sort);
-                if (searchParams.dir) p.set("dir", searchParams.dir);
-                return `/admin/campaigns${p.toString() ? "?" + p.toString() : ""}`;
-              })()}
-              className={
-                !stateFilter
-                  ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-                  : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-              }
-            >
-              All
-            </Link>
-            {STATE_FILTERS.map((s) => (
-              <Link
-                key={s}
-                href={(() => {
-                  const p = new URLSearchParams();
-                  if (searchParams.sort) p.set("sort", searchParams.sort);
-                  if (searchParams.dir) p.set("dir", searchParams.dir);
-                  p.set("state", s);
-                  return `/admin/campaigns?${p.toString()}`;
-                })()}
-                className={
-                  stateFilter === s
-                    ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-                    : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
-                }
-              >
-                {statusLabel(s)}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <FilterChips
+          label="State"
+          name="state"
+          basePath="/admin/campaigns"
+          items={STATE_FILTERS.map((s) => ({ value: s, label: statusLabel(s) }))}
+          active={stateFilter ?? undefined}
+          preserve={searchParams}
+        />
         <span className="ml-auto text-xs text-slate-500">
           Showing {campaigns.length} of {campaignsRaw.length}
         </span>
@@ -192,9 +132,9 @@ export default async function CampaignsPage({
             <thead>
               <tr className="border-b border-slate-200">
                 <th className="th w-8"></th>
-                <SortHeader label="Campaign" k="name" current={sort} dir={dir} />
-                <SortHeader label="Advertiser" k="advertiser" current={sort} dir={dir} />
-                <SortHeader label="Flight" k="flight" current={sort} dir={dir} />
+                <SortHeader label="Campaign" k="name" current={sort} dir={dir} basePath="/admin/campaigns" preserve={searchParams} />
+                <SortHeader label="Advertiser" k="advertiser" current={sort} dir={dir} basePath="/admin/campaigns" preserve={searchParams} />
+                <SortHeader label="Flight" k="flight" current={sort} dir={dir} basePath="/admin/campaigns" preserve={searchParams} />
                 <th className="th">Platforms</th>
                 <th className="th">Pricing</th>
                 <th className="th">Prio</th>
@@ -296,11 +236,7 @@ export default async function CampaignsPage({
           </table>
         </div>
 
-        <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
-          <SelectAll name="campaignId" />
-          <span className="mr-auto text-xs text-slate-500">
-            Bulk actions apply to every ticked row.
-          </span>
+        <BulkToolbar selectName="campaignId">
           <button type="submit" className="btn-secondary">
             Activate
           </button>
@@ -325,7 +261,7 @@ export default async function CampaignsPage({
           >
             Delete
           </ConfirmFormButton>
-        </div>
+        </BulkToolbar>
         </form>
       )}
     </div>

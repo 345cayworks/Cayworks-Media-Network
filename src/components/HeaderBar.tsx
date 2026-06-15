@@ -11,11 +11,9 @@ const CREATE_ITEMS = [
 ];
 
 export function HeaderBar({
-  pendingApprovals,
   userEmail,
   signOutSlot,
 }: {
-  pendingApprovals: number;
   userEmail: string;
   signOutSlot: React.ReactNode;
 }) {
@@ -45,18 +43,6 @@ export function HeaderBar({
           className="w-full max-w-md cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-400"
         />
       </div>
-
-      <Link
-        href="/admin/approvals"
-        className="relative inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-slate-600 hover:bg-slate-100"
-      >
-        Approvals
-        {pendingApprovals > 0 && (
-          <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-            {pendingApprovals}
-          </span>
-        )}
-      </Link>
 
       <div className="relative" ref={ref}>
         <button

@@ -1,9 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-
-const CLOUD = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? "";
-const PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? "";
+import { useCloudinaryUpload } from "@/lib/use-cloudinary-upload";
 
 type Uploaded = {
   url: string;
@@ -26,54 +24,23 @@ export function DropToAttach({
   action: (formData: FormData) => void;
 }) {
   const [up, setUp] = useState<Uploaded | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { upload, busy, error, ready: cloudinaryReady } = useCloudinaryUpload();
 
-  const cloudinaryReady = CLOUD.length > 0 && PRESET.length > 0;
-
-  async function upload(file: File) {
-    setError(null);
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("upload_preset", PRESET);
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD}/auto/upload`,
-        { method: "POST", body: fd },
-      );
-      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-      const json = (await res.json()) as {
-        secure_url?: string;
-        resource_type?: string;
-        width?: number;
-        height?: number;
-      };
-      if (!json.secure_url) throw new Error("No URL returned by Cloudinary");
-      const kind: "image" | "video" =
-        json.resource_type === "video" ? "video" : "image";
-      setUp({
-        url: json.secure_url,
-        kind,
-        width: json.width,
-        height: json.height,
-        filename: file.name.replace(/\.[^.]+$/, ""),
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setBusy(false);
-      if (fileRef.current) fileRef.current.value = "";
+  async function handleFile(file: File) {
+    const r = await upload(file);
+    if (r) {
+      setUp({ ...r, filename: file.name.replace(/\.[^.]+$/, "") });
     }
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   function onDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDrag(false);
     const f = e.dataTransfer.files?.[0];
-    if (f) upload(f);
+    if (f) handleFile(f);
   }
 
   if (!cloudinaryReady) {
@@ -115,7 +82,7 @@ export function DropToAttach({
             disabled={busy}
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) upload(f);
+              if (f) handleFile(f);
             }}
             className="text-xs text-slate-500 file:mr-2 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-700 file:shadow-sm"
           />

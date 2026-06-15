@@ -3,6 +3,8 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, EmptyState, Badge } from "@/components/ui";
+import { FilterChips } from "@/components/FilterChips";
+import { BulkToolbar } from "@/components/BulkToolbar";
 import { setApproval, bulkSetApproval } from "../creatives/actions";
 
 export const dynamic = "force-dynamic";
@@ -42,12 +44,6 @@ export default async function ApprovalsPage({
     },
   });
 
-  function chipClass(active: boolean): string {
-    return active
-      ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
-      : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100";
-  }
-
   return (
     <div>
       <PageHeader
@@ -56,23 +52,13 @@ export default async function ApprovalsPage({
       />
 
       <div className="card mb-4 flex flex-wrap items-end justify-between gap-3 p-3">
-        <div className="flex items-end gap-2">
-          <span className="label">Type</span>
-          <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
-            <Link href="/admin/approvals" className={chipClass(!searchParams.type)}>
-              All
-            </Link>
-            {TYPES.map((t) => (
-              <Link
-                key={t}
-                href={`/admin/approvals?type=${t}`}
-                className={chipClass(searchParams.type === t)}
-              >
-                {t}
-              </Link>
-            ))}
-          </div>
-        </div>
+        <FilterChips
+          label="Type"
+          name="type"
+          basePath="/admin/approvals"
+          items={TYPES.map((t) => ({ value: t }))}
+          active={searchParams.type}
+        />
         <span className="text-xs text-slate-500">
           Tick multiple, then use the bulk buttons at the bottom.
         </span>
@@ -155,10 +141,10 @@ export default async function ApprovalsPage({
             })}
           </div>
 
-          <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
-            <span className="mr-auto text-xs text-slate-500">
-              Bulk action applies to every ticked card.
-            </span>
+          <BulkToolbar
+            selectName="creativeId"
+            hint="Bulk action applies to every ticked card."
+          >
             <button type="submit" className="btn-primary">
               Approve selected
             </button>
@@ -169,7 +155,7 @@ export default async function ApprovalsPage({
             >
               Reject selected
             </button>
-          </div>
+          </BulkToolbar>
         </form>
       )}
     </div>
