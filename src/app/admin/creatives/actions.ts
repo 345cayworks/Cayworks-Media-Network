@@ -221,6 +221,52 @@ export async function detachCreativeFromCampaign(
   revalidatePath(`/admin/creatives/${creativeId}`);
 }
 
+/** Bulk-flip the status on many campaign-creative links of a single campaign. */
+export async function bulkSetCampaignCreativeStatus(
+  campaignId: string,
+  status: "ACTIVE" | "PAUSED",
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("creativeId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath(`/admin/campaigns/${campaignId}`);
+    return;
+  }
+  await prisma.campaignCreative.updateMany({
+    where: { campaignId, creativeId: { in: ids } },
+    data: { status },
+  });
+  await audit(user, `CREATIVE_LINK_BULK_${status}`, "Campaign", campaignId, {
+    count: ids.length,
+  });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+}
+
+/** Bulk detach (remove the link only — creatives themselves stay). */
+export async function bulkDetachCreativesFromCampaign(
+  campaignId: string,
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("creativeId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath(`/admin/campaigns/${campaignId}`);
+    return;
+  }
+  await prisma.campaignCreative.deleteMany({
+    where: { campaignId, creativeId: { in: ids } },
+  });
+  await audit(user, "DETACH_BULK", "Campaign", campaignId, { count: ids.length });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+}
+
 /** Toggle ACTIVE / PAUSED on a single campaign-creative link. */
 export async function setCampaignCreativeStatus(
   creativeId: string,

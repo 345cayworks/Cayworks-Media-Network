@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireUser, getSessionUser, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { StatusPill } from "@/components/StatusPill";
 import { effectiveStatus } from "@/lib/campaign-status";
@@ -20,7 +20,12 @@ import { DeleteButton } from "@/components/DeleteButton";
 import {
   detachCreativeFromCampaign,
   createAndAttachCreative,
+  setApproval,
+  setCampaignCreativeStatus,
+  bulkSetCampaignCreativeStatus,
+  bulkDetachCreativesFromCampaign,
 } from "@/app/admin/creatives/actions";
+import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import { DropToAttach } from "@/components/DropToAttach";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +36,8 @@ export default async function CampaignDetailPage({
   params: { id: string };
 }) {
   await requireUser();
+  const sessionUser = await getSessionUser();
+  const canApprove = !!sessionUser && ADMIN_ROLES.includes(sessionUser.role);
   const c = await prisma.campaign.findUnique({
     where: { id: params.id },
     include: {
@@ -215,9 +222,13 @@ export default async function CampaignDetailPage({
             <EmptyState message="No creatives attached yet. Attach an existing one below or upload a new asset." />
           </div>
         ) : (
+          <form
+            action={bulkSetCampaignCreativeStatus.bind(null, c.id, "ACTIVE")}
+          >
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
+                <th className="th w-8"></th>
                 <th className="th">Title</th>
                 <th className="th">Type</th>
                 <th className="th">Approval</th>
@@ -228,8 +239,17 @@ export default async function CampaignDetailPage({
             <tbody>
               {c.creativeLinks.map((l) => {
                 const cr = l.creative;
+                const nextLink = l.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
                 return (
                 <tr key={l.id} className="border-b border-slate-50">
+                  <td className="td">
+                    <input
+                      type="checkbox"
+                      name="creativeId"
+                      value={cr.id}
+                      className="h-3.5 w-3.5"
+                    />
+                  </td>
                   <td className="td font-medium">
                     <Link
                       href={`/admin/creatives/${cr.id}`}
@@ -245,24 +265,80 @@ export default async function CampaignDetailPage({
                   <td className="td">
                     <Badge value={l.status} />
                   </td>
-                  <td className="td text-right">
-                    <form
-                      action={detachCreativeFromCampaign.bind(
-                        null,
-                        cr.id,
-                        c.id,
+                  <td className="td">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {canApprove && cr.approvalStatus !== "APPROVED" && (
+                        <button
+                          type="submit"
+                          formAction={setApproval.bind(null, cr.id, "APPROVED")}
+                          className="btn-primary"
+                        >
+                          Approve
+                        </button>
                       )}
-                    >
-                      <button className="btn-secondary" type="submit">
+                      {canApprove && cr.approvalStatus !== "REJECTED" && (
+                        <button
+                          type="submit"
+                          formAction={setApproval.bind(null, cr.id, "REJECTED")}
+                          className="btn-danger"
+                        >
+                          Reject
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        formAction={setCampaignCreativeStatus.bind(
+                          null,
+                          cr.id,
+                          c.id,
+                          nextLink,
+                        )}
+                        className="btn-secondary"
+                        title={l.status === "ACTIVE" ? "Pause this link" : "Reactivate this link"}
+                      >
+                        {l.status === "ACTIVE" ? "Pause" : "Reactivate"}
+                      </button>
+                      <button
+                        type="submit"
+                        formAction={detachCreativeFromCampaign.bind(
+                          null,
+                          cr.id,
+                          c.id,
+                        )}
+                        className="btn-secondary"
+                      >
                         Detach
                       </button>
-                    </form>
+                    </div>
                   </td>
                 </tr>
                 );
               })}
             </tbody>
           </table>
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-3 py-2 text-xs">
+            <span className="mr-auto text-slate-500">
+              Bulk action applies to every ticked creative.
+            </span>
+            <button type="submit" className="btn-secondary">
+              Reactivate
+            </button>
+            <button
+              type="submit"
+              formAction={bulkSetCampaignCreativeStatus.bind(null, c.id, "PAUSED")}
+              className="btn-secondary"
+            >
+              Pause
+            </button>
+            <ConfirmFormButton
+              action={bulkDetachCreativesFromCampaign.bind(null, c.id)}
+              className="btn-danger"
+              confirmText="Detach the selected creatives from this campaign? The creatives themselves are kept in the library."
+            >
+              Detach
+            </ConfirmFormButton>
+          </div>
+          </form>
         )}
       </div>
 
