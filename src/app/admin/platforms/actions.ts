@@ -79,6 +79,46 @@ export async function setPlatformStatus(
   revalidatePath(`/admin/platforms/${id}`);
 }
 
+export async function bulkSetPlatformStatus(
+  status: "ACTIVE" | "INACTIVE",
+  formData: FormData,
+) {
+  const user = await requireRole(ADMIN_ROLES);
+  const ids = formData
+    .getAll("platformId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/platforms");
+    return;
+  }
+  await prisma.platform.updateMany({
+    where: { id: { in: ids } },
+    data: { status },
+  });
+  await audit(user, `STATUS_BULK_${status}`, "Platform", null, {
+    count: ids.length,
+  });
+  revalidatePath("/admin");
+  revalidatePath("/admin/platforms");
+}
+
+export async function bulkDeletePlatforms(formData: FormData) {
+  const user = await requireRole(ADMIN_ROLES);
+  const ids = formData
+    .getAll("platformId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/platforms");
+    return;
+  }
+  await prisma.platform.deleteMany({ where: { id: { in: ids } } });
+  await audit(user, "DELETE_BULK", "Platform", null, { count: ids.length });
+  revalidatePath("/admin");
+  revalidatePath("/admin/platforms");
+}
+
 export async function createPlacement(platformId: string, formData: FormData) {
   const user = await requireRole(ADMIN_ROLES);
   const raw = { ...Object.fromEntries(formData), platformId };

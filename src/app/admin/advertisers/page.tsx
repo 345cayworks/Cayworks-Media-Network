@@ -9,6 +9,7 @@ import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import {
   bulkSetAdvertiserStatus,
   bulkDeleteAdvertisers,
+  setAdvertiserStatus,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -190,6 +191,7 @@ export default async function AdvertisersPage({
                 </th>
                 <th className="th">Billing</th>
                 <SortHeader label="Status" k="status" current={sort} dir={dir} basePath="/admin/advertisers" preserve={searchParams} />
+                <th className="th"></th>
               </tr>
             </thead>
             <tbody>
@@ -231,6 +233,20 @@ export default async function AdvertisersPage({
                   </td>
                   <td className="td">
                     <Badge value={a.status} />
+                  </td>
+                  <td className="td text-right">
+                    <button
+                      type="submit"
+                      formAction={setAdvertiserStatus.bind(
+                        null,
+                        a.id,
+                        a.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+                      )}
+                      className="btn-secondary"
+                      title={a.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                    >
+                      {a.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                    </button>
                   </td>
                 </tr>
                 );

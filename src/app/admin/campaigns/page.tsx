@@ -11,6 +11,7 @@ import { FilterChips } from "@/components/FilterChips";
 import {
   bulkSetCampaignStatus,
   bulkDeleteCampaigns,
+  setCampaignStatus,
 } from "./actions";
 import {
   effectiveStatus,
@@ -194,6 +195,7 @@ export default async function CampaignsPage({
                 <th className="th">Prio</th>
                 <th className="th">Creatives</th>
                 <th className="th">State</th>
+                <th className="th"></th>
               </tr>
             </thead>
             <tbody>
@@ -282,6 +284,29 @@ export default async function CampaignsPage({
                     <td className="td">{c._count.creativeLinks}</td>
                     <td className="td">
                       <StatusPill campaign={c} />
+                    </td>
+                    <td className="td text-right">
+                      {c.status === "ACTIVE" ? (
+                        <button
+                          type="submit"
+                          formAction={setCampaignStatus.bind(null, c.id, "PAUSED")}
+                          className="btn-secondary"
+                          title="Pause this campaign"
+                        >
+                          Pause
+                        </button>
+                      ) : c.status === "ENDED" ? (
+                        <span className="text-xs text-slate-400">—</span>
+                      ) : (
+                        <button
+                          type="submit"
+                          formAction={setCampaignStatus.bind(null, c.id, "ACTIVE")}
+                          className="btn-secondary"
+                          title="Activate this campaign"
+                        >
+                          Activate
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
