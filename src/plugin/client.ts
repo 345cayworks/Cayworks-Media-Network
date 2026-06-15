@@ -82,6 +82,10 @@ export async function fetchAd(
     userRole?: string;
     category?: string;
     pageUrl?: string;
+    /** Hints for lazy auto-registration of unknown placement keys. */
+    variant?: string;
+    width?: number;
+    height?: number;
   },
 ): Promise<AdPayload | null> {
   const url = new URL("/api/ads/serve", cfg.engineUrl);
@@ -91,6 +95,10 @@ export async function fetchAd(
   if (params.userRole) url.searchParams.set("userRole", params.userRole);
   if (params.category) url.searchParams.set("category", params.category);
   if (params.pageUrl) url.searchParams.set("pageUrl", params.pageUrl);
+  // Hints for lazy auto-registration of unknown placement keys.
+  if (params.variant) url.searchParams.set("variant", params.variant);
+  if (params.width) url.searchParams.set("w", String(Math.round(params.width)));
+  if (params.height) url.searchParams.set("h", String(Math.round(params.height)));
 
   try {
     const res = await fetch(url.toString(), {
@@ -115,6 +123,10 @@ export async function fetchAdQueue(
     userRole?: string;
     category?: string;
     pageUrl?: string;
+    /** Hints for lazy auto-registration of unknown placement keys. */
+    variant?: string;
+    width?: number;
+    height?: number;
   },
   count: number,
 ): Promise<AdPayload[]> {
@@ -124,6 +136,9 @@ export async function fetchAdQueue(
   url.searchParams.set("count", String(count));
   url.searchParams.set("anonymousUserId", anonymousUserId());
   if (params.userRole) url.searchParams.set("userRole", params.userRole);
+  if (params.variant) url.searchParams.set("variant", params.variant);
+  if (params.width) url.searchParams.set("w", String(Math.round(params.width)));
+  if (params.height) url.searchParams.set("h", String(Math.round(params.height)));
   if (params.category) url.searchParams.set("category", params.category);
   if (params.pageUrl) url.searchParams.set("pageUrl", params.pageUrl);
 

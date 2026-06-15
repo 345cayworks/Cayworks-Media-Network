@@ -205,6 +205,9 @@ model AdPlacement {
   allowedSizes  String[]        @default([])
   placementType PlacementType   @default(BANNER)
   status        PlacementStatus @default(ACTIVE)
+  // Set when the row was auto-created by /api/ads/serve hitting an unknown
+  // placement key. Such rows land in INACTIVE for admin review/approval.
+  autoRegisteredAt DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 

@@ -109,9 +109,17 @@ export function AdSlot(props: AdSlotProps) {
       });
     }
     async function load() {
+      // Best-effort size + variant hints so the engine can auto-register
+      // unknown placement keys with something useful seeded in.
+      const measured = containerRef.current?.getBoundingClientRect();
+      const hints = {
+        variant: props.variant && props.variant !== "auto" ? props.variant : undefined,
+        width: measured?.width || undefined,
+        height: measured?.height || undefined,
+      };
       const result = rotate
-        ? await fetchAdQueue(cfg, { placement, userRole, category }, queueSize)
-        : await fetchAd(cfg, { placement, userRole, category }).then((a) =>
+        ? await fetchAdQueue(cfg, { placement, userRole, category, ...hints }, queueSize)
+        : await fetchAd(cfg, { placement, userRole, category, ...hints }).then((a) =>
             a ? [a] : [],
           );
       if (!active) return;

@@ -119,7 +119,21 @@ export default async function PlatformDetailPage({
                 const next = pl.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
                 return (
                   <tr key={pl.id} className="border-b border-slate-50">
-                    <td className="td font-medium">{pl.name}</td>
+                    <td className="td font-medium">
+                      {pl.name}
+                      {pl.autoRegisteredAt && (
+                        <span
+                          title={`Auto-registered ${pl.autoRegisteredAt
+                            .toISOString()
+                            .slice(0, 16)
+                            .replace("T", " ")} — review and activate`}
+                          className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 align-middle"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          Auto-registered
+                        </span>
+                      )}
+                    </td>
                     <td className="td font-mono text-xs">{pl.placementKey}</td>
                     <td className="td">{pl.placementType}</td>
                     <td className="td text-xs">

@@ -229,6 +229,16 @@ The response lists `created`, `updated`, and `stale` placement keys
 to `INACTIVE`; otherwise stale is informational. The platform's
 **Last sync** timestamp is shown on `/admin/platforms`.
 
+### Lazy auto-registration
+
+When `<AdSlot>` requests a placement key the engine has never seen,
+the engine **auto-creates an `AdPlacement` row in INACTIVE** using the
+plugin's hints (variant, container width/height, page URL) and shows
+an "Auto-registered" badge on `/admin/platforms/[id]`. The row doesn't
+serve until an admin reviews and activates it (selection ignores
+INACTIVE placements). Pass `?autoRegister=0` on the serve call to opt
+out per request.
+
 ### Timed rotation
 
 Add `rotateSeconds` to any slot to cycle multiple ads on a timer:
