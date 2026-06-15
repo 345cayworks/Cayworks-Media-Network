@@ -9,6 +9,8 @@ import { FilterChips } from "@/components/FilterChips";
 import {
   bulkDeleteCreatives,
   bulkSetApproval,
+  setApproval,
+  bulkAttachLibrarySelectionToCampaign,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +80,17 @@ export default async function CreativesPage({
     where,
     orderBy: orderForSort(sort),
     include: { _count: { select: { campaignLinks: true } } },
+  });
+
+  // Campaigns available as targets for the bulk-attach action in the toolbar.
+  const campaigns = await prisma.campaign.findMany({
+    select: {
+      id: true,
+      name: true,
+      advertiser: { select: { businessName: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
   });
 
   const baseQs = new URLSearchParams();
@@ -239,6 +252,24 @@ export default async function CreativesPage({
                     </div>
                   </div>
                 </Link>
+                <div className="flex gap-1 border-t border-slate-100 p-2">
+                  <button
+                    type="submit"
+                    formAction={setApproval.bind(null, cr.id, "APPROVED")}
+                    disabled={cr.approvalStatus === "APPROVED"}
+                    className="btn-primary flex-1 text-xs disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="submit"
+                    formAction={setApproval.bind(null, cr.id, "REJECTED")}
+                    disabled={cr.approvalStatus === "REJECTED"}
+                    className="btn-danger flex-1 text-xs disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -247,6 +278,30 @@ export default async function CreativesPage({
             selectName="creativeId"
             hint="Bulk actions apply to every ticked card."
           >
+            {campaigns.length > 0 && (
+              <>
+                <select
+                  name="targetCampaignId"
+                  defaultValue=""
+                  className="input max-w-[220px] text-xs"
+                  title="Pick a campaign to attach the selected creatives to"
+                >
+                  <option value="">Attach to…</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} — {c.advertiser.businessName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  formAction={bulkAttachLibrarySelectionToCampaign}
+                  className="btn-secondary"
+                >
+                  Attach selected
+                </button>
+              </>
+            )}
             <button type="submit" className="btn-primary">
               Approve selected
             </button>

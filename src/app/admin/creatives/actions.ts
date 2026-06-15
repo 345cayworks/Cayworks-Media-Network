@@ -154,6 +154,40 @@ export async function bulkDeleteCreatives(formData: FormData) {
   revalidatePath("/admin/approvals");
 }
 
+/** Bulk-attach a Library multi-selection into a single target campaign.
+ *  Reads creativeId[] + targetCampaignId from the form payload. */
+export async function bulkAttachLibrarySelectionToCampaign(formData: FormData) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("creativeId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  const targetCampaignId = String(formData.get("targetCampaignId") ?? "");
+  if (ids.length === 0 || !targetCampaignId) {
+    revalidatePath("/admin/creatives");
+    return;
+  }
+  for (const creativeId of ids) {
+    await prisma.campaignCreative.upsert({
+      where: {
+        campaignId_creativeId: { campaignId: targetCampaignId, creativeId },
+      },
+      create: {
+        campaignId: targetCampaignId,
+        creativeId,
+        status: "ACTIVE",
+        weight: 1,
+      },
+      update: { status: "ACTIVE" },
+    });
+  }
+  await audit(user, "ATTACH_BULK_LIBRARY", "Campaign", targetCampaignId, {
+    count: ids.length,
+  });
+  revalidatePath("/admin/creatives");
+  revalidatePath(`/admin/campaigns/${targetCampaignId}`);
+}
+
 /** Attach an existing creative to a campaign (idempotent, ACTIVE link). */
 export async function attachCreativeToCampaign(
   creativeId: string,

@@ -16,7 +16,12 @@ const TABS = [
 export default async function ReportingPage({
   searchParams,
 }: {
-  searchParams: { groupBy?: string; from?: string; to?: string };
+  searchParams: {
+    groupBy?: string;
+    from?: string;
+    to?: string;
+    metric?: string;
+  };
 }) {
   await requireRole(REPORT_ROLES);
 
@@ -154,21 +159,82 @@ export default async function ReportingPage({
         <EmptyState message="No data for the selected range." />
       ) : (
         <>
-          <div className="card mb-4 p-4">
-            <SectionTitle
-              title="Impressions"
-              hint={`Top ${Math.min(10, rows.length)} ${
-                TABS.find((t) => t.key === dim)?.label.toLowerCase() ?? ""
-              }`}
-            />
-            <HBar
-              data={rows.slice(0, 10).map((r) => ({
-                label: r.label,
-                value: r.impressions,
-                sub: `${r.ctr.toFixed(1)}% CTR`,
-              }))}
-            />
-          </div>
+          {(() => {
+            const metric: "impressions" | "clicks" | "ctr" =
+              searchParams.metric === "clicks"
+                ? "clicks"
+                : searchParams.metric === "ctr"
+                  ? "ctr"
+                  : "impressions";
+            const title =
+              metric === "clicks"
+                ? "Clicks"
+                : metric === "ctr"
+                  ? "CTR"
+                  : "Impressions";
+            const value = (r: (typeof rows)[number]) =>
+              metric === "clicks"
+                ? r.clicks
+                : metric === "ctr"
+                  ? r.ctr
+                  : r.impressions;
+            const format =
+              metric === "ctr"
+                ? (n: number) => `${n.toFixed(2)}%`
+                : (n: number) => n.toLocaleString();
+            const tabLabel = TABS.find((t) => t.key === dim)?.label.toLowerCase() ?? "";
+            const sorted = [...rows].sort((a, b) => value(b) - value(a));
+            function metricHref(m: string): string {
+              const p = new URLSearchParams();
+              p.set("groupBy", dim);
+              if (searchParams.from) p.set("from", searchParams.from);
+              if (searchParams.to) p.set("to", searchParams.to);
+              if (m !== "impressions") p.set("metric", m);
+              return `/admin/reporting?${p.toString()}`;
+            }
+            const chip = (m: string, label: string) => {
+              const active = metric === m;
+              return (
+                <a
+                  key={m}
+                  href={metricHref(m)}
+                  className={
+                    active
+                      ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                      : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                  }
+                >
+                  {label}
+                </a>
+              );
+            };
+            return (
+              <div className="card mb-4 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <SectionTitle
+                    title={title}
+                    hint={`Top ${Math.min(10, rows.length)} ${tabLabel}`}
+                  />
+                  <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
+                    {chip("impressions", "Impressions")}
+                    {chip("clicks", "Clicks")}
+                    {chip("ctr", "CTR")}
+                  </div>
+                </div>
+                <HBar
+                  data={sorted.slice(0, 10).map((r) => ({
+                    label: r.label,
+                    value: value(r),
+                    sub:
+                      metric === "ctr"
+                        ? `${r.impressions.toLocaleString()} impr`
+                        : `${r.ctr.toFixed(1)}% CTR`,
+                  }))}
+                  format={format}
+                />
+              </div>
+            );
+          })()}
           <div className="card overflow-x-auto">
           <table className="w-full">
             <thead>
