@@ -1,6 +1,52 @@
 import { clsx } from "@/lib/clsx";
 
 /**
+ * Tiny inline-SVG sparkline. Sized via `width`/`height` and the parent
+ * container; values scale to fill the box. Used inside Stat cards.
+ */
+export function Sparkline({
+  values,
+  width = 96,
+  height = 24,
+  stroke = "currentColor",
+  fill = "rgba(31, 111, 235, 0.15)",
+  className,
+}: {
+  values: number[];
+  width?: number;
+  height?: number;
+  stroke?: string;
+  fill?: string;
+  className?: string;
+}) {
+  if (values.length === 0)
+    return <div style={{ width, height }} className={className} />;
+  const max = Math.max(1, ...values);
+  const step = values.length === 1 ? width : width / (values.length - 1);
+  const pts = values.map((v, i) => {
+    const x = i * step;
+    const y = height - (v / max) * height;
+    return [x, y] as const;
+  });
+  const path = pts
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(1)},${p[1].toFixed(1)}`)
+    .join(" ");
+  const area = `${path} L${width},${height} L0,${height} Z`;
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
+      height={height}
+      className={className}
+      preserveAspectRatio="none"
+    >
+      <path d={area} fill={fill} stroke="none" />
+      <path d={path} fill="none" stroke={stroke} strokeWidth={1.5} />
+    </svg>
+  );
+}
+
+/**
  * Horizontal bar chart. Pure CSS/HTML — no dep, no SVG, accessible and prints
  * cleanly. Bars are sized proportional to the largest value.
  */

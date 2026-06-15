@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { clsx } from "@/lib/clsx";
+import { Sparkline } from "@/components/Chart";
 
 const TONE: Record<string, string> = {
   green: "bg-emerald-100 text-emerald-700",
@@ -55,12 +56,23 @@ export function Stat({
   value,
   hint,
   accent = "brand",
+  spark,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   accent?: keyof typeof ACCENT;
+  /** Optional series for a small trend sparkline at the bottom. */
+  spark?: number[];
 }) {
+  const sparkColor =
+    accent === "emerald"
+      ? "#10b981"
+      : accent === "rose"
+        ? "#f43f5e"
+        : accent === "amber"
+          ? "#f59e0b"
+          : "#1f6feb";
   return (
     <div className="card relative overflow-hidden p-4">
       <div
@@ -77,6 +89,17 @@ export function Stat({
           {value}
         </div>
         {hint && <div className="mt-0.5 text-xs text-slate-400">{hint}</div>}
+        {spark && spark.length > 0 && (
+          <div className="mt-2 -mx-1 text-slate-400">
+            <Sparkline
+              values={spark}
+              width={120}
+              height={22}
+              stroke={sparkColor}
+              fill={`${sparkColor}22`}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

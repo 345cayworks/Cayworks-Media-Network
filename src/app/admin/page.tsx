@@ -75,13 +75,22 @@ export default async function DashboardPage() {
           label="Impressions"
           value={s.impressions.toLocaleString()}
           accent="brand"
+          spark={daily.map((d) => d.impressions)}
         />
         <Stat
           label="Clicks"
           value={s.clicks.toLocaleString()}
           accent="brand"
+          spark={daily.map((d) => d.clicks)}
         />
-        <Stat label="CTR" value={`${s.ctr.toFixed(2)}%`} accent="brand" />
+        <Stat
+          label="CTR"
+          value={`${s.ctr.toFixed(2)}%`}
+          accent="brand"
+          spark={daily.map((d) =>
+            d.impressions === 0 ? 0 : (d.clicks / d.impressions) * 100,
+          )}
+        />
         <Link href="/admin/approvals" className="block">
           <Stat
             label="Pending Approvals"

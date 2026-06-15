@@ -87,6 +87,32 @@ export async function setApproval(
   revalidatePath("/admin/approvals");
 }
 
+/** Bulk approve/reject for the Approvals inbox. Reads creativeId[] from the
+ *  form payload and applies the same status to all of them. */
+export async function bulkSetApproval(
+  approvalStatus: "APPROVED" | "REJECTED",
+  formData: FormData,
+) {
+  const user = await requireRole(ADMIN_ROLES);
+  const ids = formData
+    .getAll("creativeId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/approvals");
+    return;
+  }
+  await prisma.creative.updateMany({
+    where: { id: { in: ids } },
+    data: { approvalStatus },
+  });
+  await audit(user, `APPROVAL_BULK_${approvalStatus}`, "Creative", null, {
+    count: ids.length,
+  });
+  revalidatePath("/admin/approvals");
+  revalidatePath("/admin/creatives");
+}
+
 /** Create a new creative and attach it to a campaign in one shot. Used by
  *  the drop-zone uploader on the campaign detail page. */
 export async function createAndAttachCreative(
