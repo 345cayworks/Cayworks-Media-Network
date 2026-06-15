@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
+import { PageHeader, EmptyState, LinkButton } from "@/components/ui";
+import { StatusPill } from "@/components/StatusPill";
 
 export const dynamic = "force-dynamic";
 
@@ -78,8 +79,15 @@ export default async function CampaignsPage({
   const campaigns = await prisma.campaign.findMany({
     orderBy: orderByFor(sort, dir),
     include: {
-      advertiser: { select: { businessName: true } },
+      advertiser: {
+        select: {
+          businessName: true,
+          status: true,
+          billingStatus: true,
+        },
+      },
       _count: { select: { creativeLinks: true, campaignPlacements: true } },
+      creativeLinks: { select: { status: true } },
       campaignPlacements: {
         select: {
           status: true,
@@ -114,7 +122,7 @@ export default async function CampaignsPage({
                 <th className="th">Pricing</th>
                 <th className="th">Prio</th>
                 <th className="th">Creatives</th>
-                <SortHeader label="Status" k="status" current={sort} dir={dir} />
+                <th className="th">State</th>
               </tr>
             </thead>
             <tbody>
@@ -194,7 +202,7 @@ export default async function CampaignsPage({
                     <td className="td">{c.priority}</td>
                     <td className="td">{c._count.creativeLinks}</td>
                     <td className="td">
-                      <Badge value={c.status} />
+                      <StatusPill campaign={c} />
                     </td>
                   </tr>
                 );

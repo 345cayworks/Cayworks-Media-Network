@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
+import { StatusPill } from "@/components/StatusPill";
+import { effectiveStatus } from "@/lib/campaign-status";
 import {
   setCampaignStatus,
   assignPlacement,
@@ -107,8 +109,16 @@ export default async function CampaignDetailPage({
 
       <div className="grid gap-3 sm:grid-cols-4">
         <div className="card p-4">
-          <div className="label">Status</div>
-          <Badge value={c.status} />
+          <div className="label">State</div>
+          <StatusPill campaign={c} />
+          {(() => {
+            const r = effectiveStatus(c);
+            return r.reasons.length > 0 && r.status !== "LIVE" ? (
+              <div className="mt-1 text-xs text-slate-500">
+                {r.reasons.join(" · ")}
+              </div>
+            ) : null;
+          })()}
         </div>
         <div className="card p-4">
           <div className="label">Flight</div>
