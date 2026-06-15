@@ -50,6 +50,45 @@ export async function setAdvertiserStatus(id: string, status: "ACTIVE" | "INACTI
   revalidatePath(`/admin/advertisers/${id}`);
 }
 
+export async function bulkSetAdvertiserStatus(
+  status: "ACTIVE" | "INACTIVE" | "PROSPECT",
+  formData: FormData,
+) {
+  const user = await requireRole(ADMIN_ROLES);
+  const ids = formData
+    .getAll("advertiserId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/advertisers");
+    return;
+  }
+  await prisma.advertiser.updateMany({
+    where: { id: { in: ids } },
+    data: { status },
+  });
+  await audit(user, `STATUS_BULK_${status}`, "Advertiser", null, {
+    count: ids.length,
+  });
+  revalidatePath("/admin/advertisers");
+}
+
+export async function bulkDeleteAdvertisers(formData: FormData) {
+  const user = await requireRole(ADMIN_ROLES);
+  const ids = formData
+    .getAll("advertiserId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/advertisers");
+    return;
+  }
+  await prisma.advertiser.deleteMany({ where: { id: { in: ids } } });
+  await audit(user, "DELETE_BULK", "Advertiser", null, { count: ids.length });
+  revalidatePath("/admin/advertisers");
+  revalidatePath("/admin/campaigns");
+}
+
 export async function deleteAdvertiser(id: string) {
   // Hard delete cascades campaigns → creatives → impressions/clicks/etc.
   // (See schema onDelete: Cascade). Prefer deactivate for routine pauses;

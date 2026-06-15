@@ -5,10 +5,27 @@ import { requireUser } from "@/lib/auth";
 import { PageHeader, EmptyState, LinkButton } from "@/components/ui";
 import { StatusPill } from "@/components/StatusPill";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
+import { SelectAll } from "@/components/SelectAll";
 import {
   bulkSetCampaignStatus,
   bulkDeleteCampaigns,
 } from "./actions";
+import {
+  effectiveStatus,
+  statusLabel,
+  type EffectiveStatus,
+} from "@/lib/campaign-status";
+
+const STATE_FILTERS: EffectiveStatus[] = [
+  "LIVE",
+  "PAUSED",
+  "DRAFT",
+  "OFF_SCHEDULE",
+  "NO_CREATIVES",
+  "NO_PLACEMENTS",
+  "ENDED",
+  "ADVERTISER_OFF",
+];
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +89,7 @@ function SortHeader({
 export default async function CampaignsPage({
   searchParams,
 }: {
-  searchParams: { sort?: string; dir?: string };
+  searchParams: { sort?: string; dir?: string; state?: string };
 }) {
   await requireUser();
 
@@ -80,8 +97,11 @@ export default async function CampaignsPage({
     ? (searchParams.sort as SortKey)
     : "created";
   const dir: Dir = searchParams.dir === "asc" ? "asc" : "desc";
+  const stateFilter = STATE_FILTERS.includes(searchParams.state as EffectiveStatus)
+    ? (searchParams.state as EffectiveStatus)
+    : null;
 
-  const campaigns = await prisma.campaign.findMany({
+  const campaignsRaw = await prisma.campaign.findMany({
     orderBy: orderByFor(sort, dir),
     include: {
       advertiser: {
@@ -106,6 +126,11 @@ export default async function CampaignsPage({
     },
   });
 
+  // Apply effective-state filter in JS — it's a derived value across many cols.
+  const campaigns = stateFilter
+    ? campaignsRaw.filter((c) => effectiveStatus(c).status === stateFilter)
+    : campaignsRaw;
+
   return (
     <div>
       <PageHeader
@@ -113,8 +138,53 @@ export default async function CampaignsPage({
         subtitle="Plan flights, pricing, priority and placement assignments."
         action={<LinkButton href="/admin/campaigns/new">New Campaign</LinkButton>}
       />
+      <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
+        <div className="flex items-end gap-2">
+          <span className="label">State</span>
+          <div className="flex flex-wrap gap-1 rounded-md border border-slate-200 bg-white p-1">
+            <Link
+              href={(() => {
+                const p = new URLSearchParams();
+                if (searchParams.sort) p.set("sort", searchParams.sort);
+                if (searchParams.dir) p.set("dir", searchParams.dir);
+                return `/admin/campaigns${p.toString() ? "?" + p.toString() : ""}`;
+              })()}
+              className={
+                !stateFilter
+                  ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                  : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              }
+            >
+              All
+            </Link>
+            {STATE_FILTERS.map((s) => (
+              <Link
+                key={s}
+                href={(() => {
+                  const p = new URLSearchParams();
+                  if (searchParams.sort) p.set("sort", searchParams.sort);
+                  if (searchParams.dir) p.set("dir", searchParams.dir);
+                  p.set("state", s);
+                  return `/admin/campaigns?${p.toString()}`;
+                })()}
+                className={
+                  stateFilter === s
+                    ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                    : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                }
+              >
+                {statusLabel(s)}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <span className="ml-auto text-xs text-slate-500">
+          Showing {campaigns.length} of {campaignsRaw.length}
+        </span>
+      </div>
+
       {campaigns.length === 0 ? (
-        <EmptyState message="No campaigns yet." />
+        <EmptyState message="No campaigns match those filters." />
       ) : (
         <form action={bulkSetCampaignStatus.bind(null, "ACTIVE")}>
         <div className="card overflow-x-auto">
@@ -227,6 +297,7 @@ export default async function CampaignsPage({
         </div>
 
         <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
+          <SelectAll name="campaignId" />
           <span className="mr-auto text-xs text-slate-500">
             Bulk actions apply to every ticked row.
           </span>

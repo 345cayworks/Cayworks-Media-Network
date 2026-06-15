@@ -3,6 +3,12 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
+import { SelectAll } from "@/components/SelectAll";
+import { ConfirmFormButton } from "@/components/ConfirmFormButton";
+import {
+  bulkSetAdvertiserStatus,
+  bulkDeleteAdvertisers,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -154,10 +160,12 @@ export default async function AdvertisersPage({
       {advertisers.length === 0 ? (
         <EmptyState message="No advertisers yet. Create your first advertiser." />
       ) : (
+        <form action={bulkSetAdvertiserStatus.bind(null, "ACTIVE")}>
         <div className="card overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
+                <th className="th w-8"></th>
                 <SortHeader label="Business" k="business" current={sort} dir={dir} />
                 <SortHeader label="Contact" k="contact" current={sort} dir={dir} />
                 <SortHeader label="Industry" k="industry" current={sort} dir={dir} />
@@ -188,6 +196,14 @@ export default async function AdvertisersPage({
                 const clicks = clkByAdv.get(a.id) ?? 0;
                 return (
                 <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50">
+                  <td className="td">
+                    <input
+                      type="checkbox"
+                      name="advertiserId"
+                      value={a.id}
+                      className="h-3.5 w-3.5"
+                    />
+                  </td>
                   <td className="td font-medium">
                     <Link
                       href={`/admin/advertisers/${a.id}`}
@@ -220,6 +236,31 @@ export default async function AdvertisersPage({
             </tbody>
           </table>
         </div>
+
+        <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
+          <SelectAll name="advertiserId" />
+          <span className="mr-auto text-xs text-slate-500">
+            Bulk actions apply to every ticked row.
+          </span>
+          <button type="submit" className="btn-secondary">
+            Activate
+          </button>
+          <button
+            type="submit"
+            formAction={bulkSetAdvertiserStatus.bind(null, "INACTIVE")}
+            className="btn-secondary"
+          >
+            Deactivate
+          </button>
+          <ConfirmFormButton
+            action={bulkDeleteAdvertisers}
+            className="btn-danger"
+            confirmText="Permanently delete the selected advertisers? This also deletes ALL their campaigns, creatives' links, and tracking data. This cannot be undone."
+          >
+            Delete
+          </ConfirmFormButton>
+        </div>
+        </form>
       )}
     </div>
   );

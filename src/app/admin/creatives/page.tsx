@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
+import { SelectAll } from "@/components/SelectAll";
 import {
   bulkDeleteCreatives,
   bulkSetApproval,
@@ -14,10 +15,49 @@ export const dynamic = "force-dynamic";
 const TYPE_FILTERS = ["IMAGE", "VIDEO", "NATIVE", "HTML"] as const;
 const APPROVAL_FILTERS = ["PENDING", "APPROVED", "REJECTED"] as const;
 
+type Sort =
+  | "newest"
+  | "oldest"
+  | "title-asc"
+  | "title-desc"
+  | "most-used"
+  | "least-used";
+
+const SORTS: { key: Sort; label: string }[] = [
+  { key: "newest", label: "Newest" },
+  { key: "oldest", label: "Oldest" },
+  { key: "title-asc", label: "Title A→Z" },
+  { key: "title-desc", label: "Title Z→A" },
+  { key: "most-used", label: "Most used" },
+  { key: "least-used", label: "Least used" },
+];
+
+function orderForSort(s: Sort): Prisma.CreativeOrderByWithRelationInput {
+  switch (s) {
+    case "oldest":
+      return { createdAt: "asc" };
+    case "title-asc":
+      return { title: "asc" };
+    case "title-desc":
+      return { title: "desc" };
+    case "most-used":
+      return { campaignLinks: { _count: "desc" } };
+    case "least-used":
+      return { campaignLinks: { _count: "asc" } };
+    default:
+      return { createdAt: "desc" };
+  }
+}
+
 export default async function CreativesPage({
   searchParams,
 }: {
-  searchParams: { approval?: string; type?: string; q?: string };
+  searchParams: {
+    approval?: string;
+    type?: string;
+    q?: string;
+    sort?: string;
+  };
 }) {
   await requireUser();
 
@@ -31,9 +71,11 @@ export default async function CreativesPage({
   const q = (searchParams.q ?? "").trim();
   if (q) where.title = { contains: q, mode: "insensitive" };
 
+  const sort: Sort = (SORTS.find((s) => s.key === searchParams.sort)?.key ??
+    "newest") as Sort;
   const creatives = await prisma.creative.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy: orderForSort(sort),
     include: { _count: { select: { campaignLinks: true } } },
   });
 
@@ -41,6 +83,7 @@ export default async function CreativesPage({
   if (q) baseQs.set("q", q);
   if (searchParams.approval) baseQs.set("approval", searchParams.approval);
   if (searchParams.type) baseQs.set("type", searchParams.type);
+  if (sort !== "newest") baseQs.set("sort", sort);
 
   function withParam(key: string, value: string | undefined): string {
     const p = new URLSearchParams(baseQs);
@@ -116,6 +159,32 @@ export default async function CreativesPage({
               </Link>
             ))}
           </div>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="label">Sort</span>
+          <form method="get" className="flex items-center gap-1">
+            {q && <input type="hidden" name="q" value={q} />}
+            {searchParams.approval && (
+              <input type="hidden" name="approval" value={searchParams.approval} />
+            )}
+            {searchParams.type && (
+              <input type="hidden" name="type" value={searchParams.type} />
+            )}
+            <select
+              name="sort"
+              defaultValue={sort}
+              className="input"
+              style={{ minWidth: 140 }}
+            >
+              {SORTS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="btn-secondary">Apply</button>
+          </form>
         </div>
 
         <div className="flex flex-col">
@@ -214,6 +283,7 @@ export default async function CreativesPage({
           </div>
 
           <div className="sticky bottom-3 z-10 mt-4 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 shadow-md backdrop-blur">
+            <SelectAll name="creativeId" />
             <span className="mr-auto text-xs text-slate-500">
               Bulk actions apply to every ticked card.
             </span>

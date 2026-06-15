@@ -1,24 +1,127 @@
+import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, EmptyState } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export default async function AuditPage() {
+const ENTITIES = [
+  "Campaign",
+  "Creative",
+  "Advertiser",
+  "Platform",
+  "AdPlacement",
+  "CampaignPlacement",
+  "CampaignCreative",
+  "User",
+] as const;
+
+export default async function AuditPage({
+  searchParams,
+}: {
+  searchParams: { entity?: string; q?: string; actor?: string };
+}) {
   await requireRole(ADMIN_ROLES);
+
+  const where: Prisma.AuditLogWhereInput = {};
+  if (ENTITIES.includes(searchParams.entity as "Campaign")) {
+    where.entity = searchParams.entity;
+  }
+  const actor = (searchParams.actor ?? "").trim();
+  if (actor)
+    where.actorEmail = { contains: actor, mode: "insensitive" };
+  const q = (searchParams.q ?? "").trim();
+  if (q) where.action = { contains: q, mode: "insensitive" };
+
   const logs = await prisma.auditLog.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     take: 200,
   });
+
+  function chipClass(active: boolean): string {
+    return active
+      ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+      : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100";
+  }
 
   return (
     <div>
       <PageHeader
         title="Audit Log"
-        subtitle="Most recent 200 administrative actions."
+        subtitle={`Showing the most recent ${logs.length} matching entries (max 200).`}
       />
+
+      <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
+        <div className="flex items-end gap-2">
+          <span className="label">Entity</span>
+          <div className="flex flex-wrap gap-1 rounded-md border border-slate-200 bg-white p-1">
+            <Link href="/admin/audit" className={chipClass(!searchParams.entity)}>
+              All
+            </Link>
+            {ENTITIES.map((e) => (
+              <Link
+                key={e}
+                href={`/admin/audit?entity=${e}`}
+                className={chipClass(searchParams.entity === e)}
+              >
+                {e}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <form className="flex flex-1 min-w-[260px] items-end gap-2" method="get">
+          {searchParams.entity && (
+            <input type="hidden" name="entity" value={searchParams.entity} />
+          )}
+          <div className="flex-1">
+            <label className="label" htmlFor="q">
+              Action contains
+            </label>
+            <input
+              id="q"
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="DELETE, APPROVAL_APPROVED, …"
+              className="input"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="label" htmlFor="actor">
+              Actor email contains
+            </label>
+            <input
+              id="actor"
+              name="actor"
+              type="search"
+              defaultValue={actor}
+              placeholder="you@cayworks.com"
+              className="input"
+            />
+          </div>
+          <button type="submit" className="btn-secondary">
+            Apply
+          </button>
+          {(q || actor) && (
+            <Link
+              href={
+                searchParams.entity
+                  ? `/admin/audit?entity=${searchParams.entity}`
+                  : "/admin/audit"
+              }
+              className="btn-secondary"
+            >
+              Clear
+            </Link>
+          )}
+        </form>
+      </div>
+
       {logs.length === 0 ? (
-        <EmptyState message="No audit entries yet." />
+        <EmptyState message="No audit entries match those filters." />
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full">
