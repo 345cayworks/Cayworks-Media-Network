@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { FilterChips } from "@/components/FilterChips";
+import { Pagination, readPaging } from "@/components/Pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ export default async function AuditPage({
     actor?: string;
     from?: string;
     to?: string;
+    page?: string;
+    pageSize?: string;
   };
 }) {
   await requireRole(ADMIN_ROLES);
@@ -50,11 +53,16 @@ export default async function AuditPage({
   }
   if (Object.keys(range).length > 0) where.createdAt = range;
 
-  const logs = await prisma.auditLog.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const paging = readPaging(searchParams, 25, 200);
+  const [logs, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: paging.skip,
+      take: paging.pageSize,
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
 
   const exportQs = new URLSearchParams();
   for (const [k, v] of Object.entries(searchParams)) {
@@ -65,7 +73,7 @@ export default async function AuditPage({
     <div>
       <PageHeader
         title="Audit Log"
-        subtitle={`Showing the most recent ${logs.length} matching entries (max 200).`}
+        subtitle={`${total.toLocaleString()} matching entries.`}
         action={
           <a
             className="btn-primary"
@@ -190,6 +198,14 @@ export default async function AuditPage({
           </table>
         </div>
       )}
+
+      <Pagination
+        total={total}
+        page={paging.page}
+        pageSize={paging.pageSize}
+        basePath="/admin/audit"
+        preserve={searchParams}
+      />
     </div>
   );
 }

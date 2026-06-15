@@ -6,6 +6,7 @@ import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { BulkToolbar } from "@/components/BulkToolbar";
 import { SortHeader } from "@/components/SortHeader";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
+import { Pagination, readPaging } from "@/components/Pagination";
 import {
   bulkSetAdvertiserStatus,
   bulkDeleteAdvertisers,
@@ -55,7 +56,13 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.AdvertiserOrderByWithRelati
 export default async function AdvertisersPage({
   searchParams,
 }: {
-  searchParams: { sort?: string; dir?: string; q?: string };
+  searchParams: {
+    sort?: string;
+    dir?: string;
+    q?: string;
+    page?: string;
+    pageSize?: string;
+  };
 }) {
   await requireUser();
 
@@ -105,7 +112,7 @@ export default async function AdvertisersPage({
   }
 
   // Aggregate-based sorts are applied in JS after the rollup above.
-  const advertisers =
+  const sorted =
     sort === "impressions" || sort === "clicks"
       ? [...advertisersRaw].sort((a, b) => {
           const av =
@@ -119,6 +126,10 @@ export default async function AdvertisersPage({
           return dir === "asc" ? av - bv : bv - av;
         })
       : advertisersRaw;
+
+  const paging = readPaging(searchParams);
+  const total = sorted.length;
+  const advertisers = sorted.slice(paging.skip, paging.skip + paging.pageSize);
 
   return (
     <div>
@@ -276,6 +287,14 @@ export default async function AdvertisersPage({
         </BulkToolbar>
         </form>
       )}
+
+      <Pagination
+        total={total}
+        page={paging.page}
+        pageSize={paging.pageSize}
+        basePath="/admin/advertisers"
+        preserve={searchParams}
+      />
     </div>
   );
 }

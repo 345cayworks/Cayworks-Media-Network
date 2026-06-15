@@ -8,6 +8,7 @@ import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import { BulkToolbar } from "@/components/BulkToolbar";
 import { SortHeader } from "@/components/SortHeader";
 import { FilterChips } from "@/components/FilterChips";
+import { Pagination, readPaging } from "@/components/Pagination";
 import {
   bulkSetCampaignStatus,
   bulkDeleteCampaigns,
@@ -61,7 +62,14 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.CampaignOrderByWithRelation
 export default async function CampaignsPage({
   searchParams,
 }: {
-  searchParams: { sort?: string; dir?: string; state?: string; q?: string };
+  searchParams: {
+    sort?: string;
+    dir?: string;
+    state?: string;
+    q?: string;
+    page?: string;
+    pageSize?: string;
+  };
 }) {
   await requireUser();
 
@@ -112,9 +120,13 @@ export default async function CampaignsPage({
   });
 
   // Apply effective-state filter in JS — it's a derived value across many cols.
-  const campaigns = stateFilter
+  const filtered = stateFilter
     ? campaignsRaw.filter((c) => effectiveStatus(c).status === stateFilter)
     : campaignsRaw;
+
+  const paging = readPaging(searchParams);
+  const total = filtered.length;
+  const campaigns = filtered.slice(paging.skip, paging.skip + paging.pageSize);
 
   return (
     <div>
@@ -174,7 +186,8 @@ export default async function CampaignsPage({
           preserve={searchParams}
         />
         <span className="ml-auto text-xs text-slate-500">
-          Showing {campaigns.length} of {campaignsRaw.length}
+          {total} match{total === 1 ? "" : "es"}
+          {campaignsRaw.length !== total && ` of ${campaignsRaw.length}`}
         </span>
       </div>
 
@@ -343,6 +356,14 @@ export default async function CampaignsPage({
         </BulkToolbar>
         </form>
       )}
+
+      <Pagination
+        total={total}
+        page={paging.page}
+        pageSize={paging.pageSize}
+        basePath="/admin/campaigns"
+        preserve={searchParams}
+      />
     </div>
   );
 }

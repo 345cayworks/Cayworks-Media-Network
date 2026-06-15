@@ -6,6 +6,7 @@ import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import { BulkToolbar } from "@/components/BulkToolbar";
 import { FilterChips } from "@/components/FilterChips";
+import { Pagination, readPaging } from "@/components/Pagination";
 import {
   bulkDeleteCreatives,
   bulkSetApproval,
@@ -60,6 +61,8 @@ export default async function CreativesPage({
     type?: string;
     q?: string;
     sort?: string;
+    page?: string;
+    pageSize?: string;
   };
 }) {
   await requireUser();
@@ -76,11 +79,17 @@ export default async function CreativesPage({
 
   const sort: Sort = (SORTS.find((s) => s.key === searchParams.sort)?.key ??
     "newest") as Sort;
-  const creatives = await prisma.creative.findMany({
-    where,
-    orderBy: orderForSort(sort),
-    include: { _count: { select: { campaignLinks: true } } },
-  });
+  const paging = readPaging(searchParams, 24);
+  const [creatives, total] = await Promise.all([
+    prisma.creative.findMany({
+      where,
+      orderBy: orderForSort(sort),
+      include: { _count: { select: { campaignLinks: true } } },
+      skip: paging.skip,
+      take: paging.pageSize,
+    }),
+    prisma.creative.count({ where }),
+  ]);
 
   // Campaigns available as targets for the bulk-attach action in the toolbar.
   const campaigns = await prisma.campaign.findMany({
@@ -322,6 +331,15 @@ export default async function CreativesPage({
           </BulkToolbar>
         </form>
       )}
+
+      <Pagination
+        total={total}
+        page={paging.page}
+        pageSize={paging.pageSize}
+        basePath="/admin/creatives"
+        preserve={searchParams}
+        pageSizes={[12, 24, 48, 96]}
+      />
     </div>
   );
 }
