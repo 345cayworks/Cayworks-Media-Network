@@ -43,6 +43,30 @@ export default async function CreativeDetailPage({
   if (!cr) notFound();
   const video = resolveVideo(cr.videoUrl);
 
+  // Performance: totals for this creative, plus a breakdown per campaign.
+  const [totalImps, totalClicks, impsByCampaign, clicksByCampaign] =
+    await Promise.all([
+      prisma.adImpression.count({ where: { creativeId: cr.id } }),
+      prisma.adClick.count({ where: { creativeId: cr.id } }),
+      prisma.adImpression.groupBy({
+        by: ["campaignId"],
+        where: { creativeId: cr.id },
+        _count: { _all: true },
+      }),
+      prisma.adClick.groupBy({
+        by: ["campaignId"],
+        where: { creativeId: cr.id },
+        _count: { _all: true },
+      }),
+    ]);
+  const impsByCamp = new Map<string, number>();
+  for (const r of impsByCampaign)
+    if (r.campaignId) impsByCamp.set(r.campaignId, r._count._all);
+  const clicksByCamp = new Map<string, number>();
+  for (const r of clicksByCampaign)
+    if (r.campaignId) clicksByCamp.set(r.campaignId, r._count._all);
+  const totalCtr = totalImps === 0 ? 0 : (totalClicks / totalImps) * 100;
+
   const linkedIds = new Set(cr.campaignLinks.map((l) => l.campaignId));
   const attachable = await prisma.campaign.findMany({
     where: { id: { notIn: [...linkedIds] } },
@@ -154,6 +178,21 @@ export default async function CreativeDetailPage({
             <Row label="Campaigns">
               <span className="text-slate-700">{cr.campaignLinks.length}</span>
             </Row>
+            <Row label="Impressions">
+              <span className="tabular-nums text-slate-700">
+                {totalImps.toLocaleString()}
+              </span>
+            </Row>
+            <Row label="Clicks">
+              <span className="tabular-nums text-slate-700">
+                {totalClicks.toLocaleString()}
+              </span>
+            </Row>
+            <Row label="CTR">
+              <span className="tabular-nums text-slate-700">
+                {totalCtr.toFixed(2)}%
+              </span>
+            </Row>
           </div>
 
           <div className="card p-4">
@@ -171,7 +210,7 @@ export default async function CreativeDetailPage({
                     key={l.id}
                     className="flex items-center justify-between gap-2 rounded-md border border-slate-100 px-3 py-2 text-sm"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <Link
                         href={`/admin/campaigns/${l.campaign.id}`}
                         className="font-medium text-brand-600 hover:underline"
@@ -179,7 +218,11 @@ export default async function CreativeDetailPage({
                         {l.campaign.name}
                       </Link>
                       <div className="text-xs text-slate-400">
-                        {l.campaign.advertiser.businessName}
+                        {l.campaign.advertiser.businessName} ·{" "}
+                        {(impsByCamp.get(l.campaignId) ?? 0).toLocaleString()}{" "}
+                        impr ·{" "}
+                        {(clicksByCamp.get(l.campaignId) ?? 0).toLocaleString()}{" "}
+                        clk
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

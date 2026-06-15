@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { StatusPill } from "@/components/StatusPill";
 import { effectiveStatus } from "@/lib/campaign-status";
+import { diagnoseForPlatform } from "@/lib/ad-diagnose";
 import {
   setCampaignStatus,
   assignPlacement,
@@ -75,6 +76,27 @@ export default async function CampaignDetailPage({
       where: { campaignId: c.id, createdAt: { gte: startOfToday } },
     }),
   ]);
+
+  // Per-placement eligibility for THIS campaign. Reuses the diagnose
+  // function and picks the candidate row matching this campaign id.
+  const eligibility = await Promise.all(
+    c.campaignPlacements.map(async (cp) => {
+      const r = await diagnoseForPlatform(
+        cp.placement.platform.slug,
+        cp.placement.platform.id,
+        cp.placement.placementKey,
+      );
+      const mine = r.candidates.find((cand) => cand.campaignId === c.id);
+      return {
+        placementId: cp.placementId,
+        eligible: !!mine?.eligible,
+        reasons: mine?.excluded ?? (r.stage === "placement" ? [r.reason ?? "Placement off"] : []),
+      };
+    }),
+  );
+  const eligibilityByPlacement = new Map(
+    eligibility.map((e) => [e.placementId, e]),
+  );
 
   return (
     <div>
@@ -305,7 +327,9 @@ export default async function CampaignDetailPage({
               </tr>
             </thead>
             <tbody>
-              {c.campaignPlacements.map((cp) => (
+              {c.campaignPlacements.map((cp) => {
+                const e = eligibilityByPlacement.get(cp.placementId);
+                return (
                 <tr key={cp.id} className="border-b border-slate-50">
                   <td className="td font-medium">
                     {cp.placement.name}
@@ -316,7 +340,26 @@ export default async function CampaignDetailPage({
                   <td className="td">{cp.placement.platform.name}</td>
                   <td className="td">{cp.weight}</td>
                   <td className="td">
-                    <Badge value={cp.status} />
+                    <div className="flex flex-col gap-1">
+                      <Badge value={cp.status} />
+                      {e?.eligible ? (
+                        <span
+                          title="Eligible to serve here"
+                          className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          Serving
+                        </span>
+                      ) : (
+                        <span
+                          title={e?.reasons.join(" · ") || "Not eligible"}
+                          className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                          {e?.reasons[0] ?? "Not eligible"}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="td text-right">
                     <div className="flex flex-wrap justify-end gap-1">
@@ -346,7 +389,8 @@ export default async function CampaignDetailPage({
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

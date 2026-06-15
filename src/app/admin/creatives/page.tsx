@@ -1,42 +1,150 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
+const TYPE_FILTERS = ["IMAGE", "VIDEO", "NATIVE", "HTML"] as const;
+const APPROVAL_FILTERS = ["PENDING", "APPROVED", "REJECTED"] as const;
+
 export default async function CreativesPage({
   searchParams,
 }: {
-  searchParams: { approval?: string };
+  searchParams: { approval?: string; type?: string; q?: string };
 }) {
   await requireUser();
-  const where =
-    searchParams.approval === "PENDING"
-      ? { approvalStatus: "PENDING" as const }
-      : {};
+
+  const where: Prisma.CreativeWhereInput = {};
+  if (APPROVAL_FILTERS.includes(searchParams.approval as "PENDING")) {
+    where.approvalStatus = searchParams.approval as "PENDING";
+  }
+  if (TYPE_FILTERS.includes(searchParams.type as "IMAGE")) {
+    where.creativeType = searchParams.type as "IMAGE";
+  }
+  const q = (searchParams.q ?? "").trim();
+  if (q) where.title = { contains: q, mode: "insensitive" };
+
   const creatives = await prisma.creative.findMany({
     where,
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { campaignLinks: true } } },
   });
 
+  const baseQs = new URLSearchParams();
+  if (q) baseQs.set("q", q);
+  if (searchParams.approval) baseQs.set("approval", searchParams.approval);
+  if (searchParams.type) baseQs.set("type", searchParams.type);
+
+  function withParam(key: string, value: string | undefined): string {
+    const p = new URLSearchParams(baseQs);
+    if (value) p.set(key, value);
+    else p.delete(key);
+    return `/admin/creatives?${p.toString()}`;
+  }
+
   return (
     <div>
       <PageHeader
         title="Creative Library"
         subtitle="Reusable creative assets. Each can be attached to many campaigns."
-        action={
-          <div className="flex gap-2">
-            <LinkButton href="/admin/creatives?approval=PENDING" variant="secondary">
-              Pending only
-            </LinkButton>
-            <LinkButton href="/admin/creatives/new">New Creative</LinkButton>
-          </div>
-        }
+        action={<LinkButton href="/admin/creatives/new">New Creative</LinkButton>}
       />
+
+      <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
+        <form className="flex flex-1 min-w-[200px] items-end gap-2" method="get">
+          {/* preserve other filters when searching */}
+          {searchParams.approval && (
+            <input type="hidden" name="approval" value={searchParams.approval} />
+          )}
+          {searchParams.type && (
+            <input type="hidden" name="type" value={searchParams.type} />
+          )}
+          <div className="flex-1">
+            <label className="label" htmlFor="q">
+              Search
+            </label>
+            <input
+              id="q"
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="Title contains…"
+              className="input"
+            />
+          </div>
+          <button type="submit" className="btn-secondary">
+            Search
+          </button>
+          {q && (
+            <Link href={withParam("q", undefined)} className="btn-secondary">
+              Clear
+            </Link>
+          )}
+        </form>
+
+        <div className="flex flex-col">
+          <span className="label">Type</span>
+          <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
+            <Link
+              href={withParam("type", undefined)}
+              className={
+                !searchParams.type
+                  ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                  : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              }
+            >
+              All
+            </Link>
+            {TYPE_FILTERS.map((t) => (
+              <Link
+                key={t}
+                href={withParam("type", t)}
+                className={
+                  searchParams.type === t
+                    ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                    : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                }
+              >
+                {t}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col">
+          <span className="label">Approval</span>
+          <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
+            <Link
+              href={withParam("approval", undefined)}
+              className={
+                !searchParams.approval
+                  ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                  : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              }
+            >
+              All
+            </Link>
+            {APPROVAL_FILTERS.map((a) => (
+              <Link
+                key={a}
+                href={withParam("approval", a)}
+                className={
+                  searchParams.approval === a
+                    ? "rounded px-2 py-1 text-xs font-medium bg-brand-500 text-white"
+                    : "rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                }
+              >
+                {a}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {creatives.length === 0 ? (
-        <EmptyState message="No creatives in the library yet." />
+        <EmptyState message="No creatives match those filters." />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {creatives.map((cr) => (
