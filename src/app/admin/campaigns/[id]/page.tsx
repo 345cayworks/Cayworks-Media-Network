@@ -13,7 +13,9 @@ import {
   cloneCampaign,
   setCampaignPlacementStatus,
   bulkAttachCreativesToCampaign,
+  bulkAssignPlacements,
 } from "../actions";
+import { Meter } from "@/components/Meter";
 import { DeleteButton } from "@/components/DeleteButton";
 import { detachCreativeFromCampaign } from "@/app/admin/creatives/actions";
 
@@ -60,9 +62,14 @@ export default async function CampaignDetailPage({
   });
   const available = allPlacements.filter((p) => !assignedIds.has(p.id));
 
-  const [imps, clicks] = await Promise.all([
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  const [imps, clicks, impsToday] = await Promise.all([
     prisma.adImpression.count({ where: { campaignId: c.id } }),
     prisma.adClick.count({ where: { campaignId: c.id } }),
+    prisma.adImpression.count({
+      where: { campaignId: c.id, createdAt: { gte: startOfToday } },
+    }),
   ]);
 
   return (
@@ -136,6 +143,36 @@ export default async function CampaignDetailPage({
           <div className="text-lg font-bold">{clicks.toLocaleString()}</div>
         </div>
       </div>
+
+      {(c.dailyImpressionLimit ||
+        c.totalImpressionLimit ||
+        c.frequencyCapPerUserPerHour ||
+        c.frequencyCapPerUserPerDay) && (
+        <div className="card mt-3 grid gap-4 p-4 sm:grid-cols-2">
+          <Meter
+            label="Today"
+            value={impsToday}
+            max={c.dailyImpressionLimit}
+          />
+          <Meter
+            label="Total"
+            value={imps}
+            max={c.totalImpressionLimit}
+          />
+          {(c.frequencyCapPerUserPerHour || c.frequencyCapPerUserPerDay) && (
+            <div className="sm:col-span-2 text-xs text-slate-500">
+              Per-user cap:{" "}
+              {c.frequencyCapPerUserPerHour
+                ? `${c.frequencyCapPerUserPerHour}/hour`
+                : "—"}
+              {" · "}
+              {c.frequencyCapPerUserPerDay
+                ? `${c.frequencyCapPerUserPerDay}/day`
+                : "—"}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Creatives */}
       <div className="mt-6 flex items-center justify-between">
@@ -306,41 +343,99 @@ export default async function CampaignDetailPage({
         )}
       </div>
 
-      {available.length > 0 && (
-        <form
-          action={assignPlacement.bind(null, c.id)}
-          className="card mt-3 flex flex-wrap items-end gap-3 p-4"
-        >
-          <div className="min-w-[240px] flex-1">
-            <label className="label" htmlFor="placementId">
-              Assign Placement
-            </label>
-            <select id="placementId" name="placementId" className="input">
-              {available.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.platform.name} — {p.name} ({p.placementKey})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="w-28">
-            <label className="label" htmlFor="weight">
-              Weight
-            </label>
-            <input
-              id="weight"
-              name="weight"
-              type="number"
-              min={1}
-              defaultValue={1}
-              className="input"
-            />
-          </div>
-          <button type="submit" className="btn-primary">
-            Assign
-          </button>
-        </form>
-      )}
+      {available.length > 0 &&
+        (() => {
+          // Group remaining placements by platform so the bulk picker is
+          // scannable: check many at once, or use the "Assign all"
+          // shortcut per platform below.
+          const byPlatform = new Map<
+            string,
+            { name: string; items: typeof available }
+          >();
+          for (const p of available) {
+            const k = p.platform.name;
+            if (!byPlatform.has(k)) byPlatform.set(k, { name: k, items: [] });
+            byPlatform.get(k)!.items.push(p);
+          }
+          const groups = [...byPlatform.values()].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          );
+          return (
+            <div className="mt-3 space-y-3">
+              <form
+                action={bulkAssignPlacements.bind(null, c.id)}
+                className="card p-4"
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="label !mb-0">Assign placements</div>
+                  <span className="text-xs text-slate-400">
+                    Tick any number across platforms, then Assign selected.
+                  </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {groups.map((g) => (
+                    <fieldset
+                      key={g.name}
+                      className="rounded-md border border-slate-200 p-3"
+                    >
+                      <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {g.name}
+                      </legend>
+                      <div className="space-y-1">
+                        {g.items.map((p) => (
+                          <label
+                            key={p.id}
+                            className="flex items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              name="placementId"
+                              value={p.id}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span className="font-medium text-slate-800">
+                              {p.name}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {p.placementKey}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
+                </div>
+                <button type="submit" className="btn-primary mt-3">
+                  Assign selected
+                </button>
+              </form>
+
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="self-center text-slate-500">
+                  Or assign every placement on:
+                </span>
+                {groups.map((g) => (
+                  <form
+                    key={g.name}
+                    action={bulkAssignPlacements.bind(null, c.id)}
+                  >
+                    {g.items.map((p) => (
+                      <input
+                        key={p.id}
+                        type="hidden"
+                        name="placementId"
+                        value={p.id}
+                      />
+                    ))}
+                    <button type="submit" className="btn-secondary">
+                      {g.name} ({g.items.length})
+                    </button>
+                  </form>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

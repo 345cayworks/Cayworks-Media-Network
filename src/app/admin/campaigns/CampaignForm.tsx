@@ -5,6 +5,16 @@ function dateValue(d?: Date): string | undefined {
   return d ? d.toISOString().slice(0, 10) : undefined;
 }
 
+// Sensible defaults for a brand-new campaign so the form is two fields, not ten.
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function plusDays(n: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 export function CampaignForm({
   action,
   advertisers,
@@ -31,6 +41,14 @@ export function CampaignForm({
           label: a.businessName,
         }))}
       />
+      <div className="-mt-2">
+        <a
+          href="/admin/advertisers/new?return=/admin/campaigns/new"
+          className="text-xs font-medium text-brand-600 hover:underline"
+        >
+          + New advertiser
+        </a>
+      </div>
       <Field
         label="Campaign Name"
         name="name"
@@ -55,14 +73,14 @@ export function CampaignForm({
           name="startDate"
           type="date"
           required
-          defaultValue={dateValue(campaign?.startDate)}
+          defaultValue={dateValue(campaign?.startDate) ?? today()}
         />
         <Field
           label="End Date"
           name="endDate"
           type="date"
           required
-          defaultValue={dateValue(campaign?.endDate)}
+          defaultValue={dateValue(campaign?.endDate) ?? plusDays(30)}
         />
         <Field
           label="Budget (USD)"

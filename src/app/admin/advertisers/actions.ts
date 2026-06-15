@@ -20,6 +20,13 @@ export async function createAdvertiser(formData: FormData) {
   const a = await prisma.advertiser.create({ data: parsed.data });
   await audit(user, "CREATE", "Advertiser", a.id, { name: a.businessName });
   revalidatePath("/admin/advertisers");
+  // Support inline-from-another-flow creation: hidden `return` field sends
+  // the operator straight back where they came from (e.g. the campaign form).
+  const ret = String(formData.get("return") ?? "");
+  if (ret.startsWith("/admin/")) {
+    const sep = ret.includes("?") ? "&" : "?";
+    redirect(`${ret}${sep}advertiserId=${a.id}`);
+  }
   redirect(`/admin/advertisers/${a.id}`);
 }
 

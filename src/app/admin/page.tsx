@@ -65,12 +65,18 @@ export default async function DashboardPage() {
           accent="brand"
         />
         <Stat label="CTR" value={`${s.ctr.toFixed(2)}%`} accent="brand" />
-        <Stat
-          label="Pending Creatives"
-          value={s.pendingCreatives}
-          hint="Awaiting approval"
-          accent="amber"
-        />
+        <Link href="/admin/approvals" className="block">
+          <Stat
+            label="Pending Approvals"
+            value={s.pendingCreatives}
+            hint={
+              s.pendingCreatives > 0
+                ? "Open the inbox →"
+                : "All caught up"
+            }
+            accent={s.pendingCreatives > 0 ? "amber" : "slate"}
+          />
+        </Link>
         <Stat
           label="Expiring (14d)"
           value={s.expiring.length}
