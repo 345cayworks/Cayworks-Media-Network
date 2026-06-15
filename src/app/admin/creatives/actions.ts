@@ -18,10 +18,32 @@ export async function createCreative(formData: FormData) {
   const user = await requireRole(STAFF_ROLES);
   const parsed = parse(formData);
   if (!parsed.success) {
-    redirect(`/admin/creatives/new?campaignId=${formData.get("campaignId")}&error=${encodeURIComponent(parsed.error.errors[0].message)}`);
+    redirect(
+      `/admin/creatives/new?error=${encodeURIComponent(parsed.error.errors[0].message)}`,
+    );
   }
   const cr = await prisma.creative.create({ data: parsed.data });
   await audit(user, "CREATE", "Creative", cr.id, { title: cr.title });
+
+  // Optional: attach to a campaign immediately if the form was opened from
+  // one (`?attachTo=<campaignId>` carried as a hidden field).
+  const attachTo = String(formData.get("attachTo") ?? "");
+  if (attachTo) {
+    await prisma.campaignCreative.upsert({
+      where: {
+        campaignId_creativeId: { campaignId: attachTo, creativeId: cr.id },
+      },
+      create: { campaignId: attachTo, creativeId: cr.id, status: "ACTIVE", weight: 1 },
+      update: {},
+    });
+    await audit(user, "ATTACH", "CampaignCreative", attachTo, {
+      creativeId: cr.id,
+    });
+    revalidatePath(`/admin/campaigns/${attachTo}`);
+    revalidatePath("/admin/creatives");
+    redirect(`/admin/campaigns/${attachTo}`);
+  }
+
   revalidatePath("/admin/creatives");
   redirect(`/admin/creatives/${cr.id}`);
 }
@@ -39,68 +61,81 @@ export async function updateCreative(id: string, formData: FormData) {
 }
 
 export async function deleteCreative(id: string) {
-  // Cascades to impressions/clicks for this creative (per schema). For a
-  // routine pause set status=INACTIVE in the edit form instead.
+  // Global delete — removes the creative from EVERY campaign it's linked to
+  // and cascades its impressions/clicks. Use detachCreativeFromCampaign to
+  // remove from a single campaign without affecting others.
   const user = await requireRole(ADMIN_ROLES);
   const cr = await prisma.creative.findUnique({
     where: { id },
-    select: { title: true, campaignId: true },
+    select: { title: true },
   });
   await prisma.creative.delete({ where: { id } });
   await audit(user, "DELETE", "Creative", id, { title: cr?.title });
   revalidatePath("/admin/creatives");
-  if (cr?.campaignId) revalidatePath(`/admin/campaigns/${cr.campaignId}`);
-  redirect(cr?.campaignId ? `/admin/campaigns/${cr.campaignId}` : "/admin/creatives");
-}
-
-export async function cloneCreative(
-  sourceId: string,
-  targetCampaignId: string,
-) {
-  // Reuse already-uploaded media (image/video URLs are shared — no
-  // re-upload) by duplicating an existing creative into another campaign.
-  // Lands the operator on the new creative's edit page to tweak per-campaign
-  // copy/CTA. Re-set to PENDING so the new campaign's review still runs.
-  const user = await requireRole(STAFF_ROLES);
-  if (!sourceId || !targetCampaignId) {
-    redirect("/admin/creatives?error=Missing+source+or+target");
-  }
-  const src = await prisma.creative.findUnique({ where: { id: sourceId } });
-  if (!src) redirect("/admin/creatives?error=Source+creative+not+found");
-
-  const cloned = await prisma.creative.create({
-    data: {
-      campaignId: targetCampaignId,
-      title: src.title,
-      description: src.description,
-      imageUrl: src.imageUrl,
-      videoUrl: src.videoUrl,
-      destinationUrl: src.destinationUrl,
-      ctaText: src.ctaText,
-      creativeType: src.creativeType,
-      width: src.width,
-      height: src.height,
-      approvalStatus: "PENDING",
-      status: "ACTIVE",
-    },
-  });
-  await audit(user, "CLONE", "Creative", cloned.id, {
-    sourceId,
-    targetCampaignId,
-  });
-  revalidatePath("/admin/creatives");
-  revalidatePath(`/admin/campaigns/${targetCampaignId}`);
-  redirect(`/admin/creatives/${cloned.id}/edit`);
+  redirect("/admin/creatives");
 }
 
 export async function setApproval(
   id: string,
   approvalStatus: "APPROVED" | "REJECTED" | "PENDING",
 ) {
-  // Approval is an admin-only gate.
   const user = await requireRole(ADMIN_ROLES);
   await prisma.creative.update({ where: { id }, data: { approvalStatus } });
   await audit(user, `APPROVAL_${approvalStatus}`, "Creative", id);
   revalidatePath(`/admin/creatives/${id}`);
   revalidatePath("/admin/creatives");
+  revalidatePath("/admin/approvals");
 }
+
+/** Attach an existing creative to a campaign (idempotent, ACTIVE link). */
+export async function attachCreativeToCampaign(
+  creativeId: string,
+  campaignId: string,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  if (!creativeId || !campaignId) {
+    redirect("/admin/creatives?error=Missing+source+or+target");
+  }
+  await prisma.campaignCreative.upsert({
+    where: { campaignId_creativeId: { campaignId, creativeId } },
+    create: { campaignId, creativeId, status: "ACTIVE", weight: 1 },
+    update: { status: "ACTIVE" },
+  });
+  await audit(user, "ATTACH", "CampaignCreative", campaignId, { creativeId });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+  revalidatePath(`/admin/creatives/${creativeId}`);
+}
+
+/** Remove a creative from one campaign without deleting the creative. */
+export async function detachCreativeFromCampaign(
+  creativeId: string,
+  campaignId: string,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  await prisma.campaignCreative.deleteMany({
+    where: { campaignId, creativeId },
+  });
+  await audit(user, "DETACH", "CampaignCreative", campaignId, { creativeId });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+  revalidatePath(`/admin/creatives/${creativeId}`);
+}
+
+/** Toggle ACTIVE / PAUSED on a single campaign-creative link. */
+export async function setCampaignCreativeStatus(
+  creativeId: string,
+  campaignId: string,
+  status: "ACTIVE" | "PAUSED",
+) {
+  const user = await requireRole(STAFF_ROLES);
+  await prisma.campaignCreative.update({
+    where: { campaignId_creativeId: { campaignId, creativeId } },
+    data: { status },
+  });
+  await audit(user, `CREATIVE_LINK_${status}`, "CampaignCreative", campaignId, {
+    creativeId,
+  });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+}
+
+// Legacy alias retained so any older imports keep compiling.
+export const cloneCreative = attachCreativeToCampaign;

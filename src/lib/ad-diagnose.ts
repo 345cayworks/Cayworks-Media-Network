@@ -70,7 +70,14 @@ export async function diagnoseForPlatform(
   const now = new Date();
   const links = await prisma.campaignPlacement.findMany({
     where: { placementId: placement.id },
-    include: { campaign: { include: { advertiser: true, creatives: true } } },
+    include: {
+      campaign: {
+        include: {
+          advertiser: true,
+          creativeLinks: { include: { creative: true } },
+        },
+      },
+    },
   });
 
   const dayStart = new Date(
@@ -89,9 +96,10 @@ export async function diagnoseForPlatform(
       reasons.push(`advertiser ${c.advertiser.status}`);
     if (c.advertiser.billingStatus === "ON_HOLD")
       reasons.push("billing ON_HOLD");
-    const approved = c.creatives.filter(
-      (cr) => cr.approvalStatus === "APPROVED" && cr.status === "ACTIVE",
-    );
+    const approved = c.creativeLinks
+      .filter((l) => l.status === "ACTIVE")
+      .map((l) => l.creative)
+      .filter((cr) => cr.approvalStatus === "APPROVED" && cr.status === "ACTIVE");
     if (approved.length === 0) reasons.push("no APPROVED + ACTIVE creatives");
 
     // Per-user frequency caps (only evaluable when a user id is supplied).

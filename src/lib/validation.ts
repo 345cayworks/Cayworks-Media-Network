@@ -81,7 +81,7 @@ export const campaignSchema = z
   });
 
 export const creativeSchema = z.object({
-  campaignId: z.string().min(1),
+  // Creatives are now standalone assets (m2m via CampaignCreative).
   title: z.string().trim().min(1, "Title is required"),
   description: optionalString,
   imageUrl: optionalString,

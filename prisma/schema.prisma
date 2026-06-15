@@ -236,7 +236,7 @@ model Campaign {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
-  creatives          Creative[]
+  creativeLinks      CampaignCreative[]
   campaignPlacements CampaignPlacement[]
   impressions        AdImpression[]
   clicks             AdClick[]
@@ -249,8 +249,6 @@ model Campaign {
 
 model Creative {
   id             String         @id @default(cuid())
-  campaignId     String
-  campaign       Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   title          String
   description    String?
   imageUrl       String?
@@ -265,11 +263,35 @@ model Creative {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  impressions AdImpression[]
-  clicks      AdClick[]
-  conversions AdConversion[]
+  campaignLinks CampaignCreative[]
+  impressions   AdImpression[]
+  clicks        AdClick[]
+  conversions   AdConversion[]
 
   @@index([approvalStatus])
+}
+
+enum CampaignCreativeStatus {
+  ACTIVE
+  PAUSED
+}
+
+// Many-to-many: a creative is a reusable asset that can be linked to many
+// campaigns. Selection iterates campaign.creativeLinks → creative.
+model CampaignCreative {
+  id         String                 @id @default(cuid())
+  campaignId String
+  campaign   Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creativeId String
+  creative   Creative               @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  status     CampaignCreativeStatus @default(ACTIVE)
+  weight     Int                    @default(1)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([campaignId, creativeId])
+  @@index([campaignId])
+  @@index([creativeId])
 }
 
 model CampaignPlacement {

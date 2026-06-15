@@ -79,7 +79,7 @@ export default async function CampaignsPage({
     orderBy: orderByFor(sort, dir),
     include: {
       advertiser: { select: { businessName: true } },
-      _count: { select: { creatives: true, campaignPlacements: true } },
+      _count: { select: { creativeLinks: true, campaignPlacements: true } },
       campaignPlacements: {
         select: {
           status: true,
@@ -192,7 +192,7 @@ export default async function CampaignsPage({
                     </td>
                     <td className="td">{c.pricingModel}</td>
                     <td className="td">{c.priority}</td>
-                    <td className="td">{c._count.creatives}</td>
+                    <td className="td">{c._count.creativeLinks}</td>
                     <td className="td">
                       <Badge value={c.status} />
                     </td>

@@ -15,13 +15,7 @@ export default async function EditCreativePage({
   searchParams: { error?: string };
 }) {
   await requireRole(STAFF_ROLES);
-  const [creative, campaigns] = await Promise.all([
-    prisma.creative.findUnique({ where: { id: params.id } }),
-    prisma.campaign.findMany({
-      select: { id: true, name: true },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  const creative = await prisma.creative.findUnique({ where: { id: params.id } });
   if (!creative) notFound();
 
   return (
@@ -29,7 +23,6 @@ export default async function EditCreativePage({
       <PageHeader title={`Edit — ${creative.title}`} />
       <CreativeForm
         action={updateCreative.bind(null, creative.id)}
-        campaigns={campaigns}
         creative={creative}
         error={searchParams.error}
       />

@@ -1,30 +1,19 @@
-import type { Creative, Campaign } from "@prisma/client";
+import type { Creative } from "@prisma/client";
 import { Field, TextArea, Select, FormError, enumOptions } from "@/components/form";
 import { MediaUpload } from "@/components/MediaUpload";
 
 export function CreativeForm({
   action,
-  campaigns,
   creative,
-  defaultCampaignId,
   error,
 }: {
   action: (formData: FormData) => void;
-  campaigns: Pick<Campaign, "id" | "name">[];
   creative?: Creative;
-  defaultCampaignId?: string;
   error?: string;
 }) {
   return (
     <form action={action} className="card max-w-2xl space-y-4 p-6">
       <FormError message={error} />
-      <Select
-        label="Campaign"
-        name="campaignId"
-        required
-        defaultValue={creative?.campaignId ?? defaultCampaignId}
-        options={campaigns.map((c) => ({ value: c.id, label: c.name }))}
-      />
       <Field
         label="Title"
         name="title"

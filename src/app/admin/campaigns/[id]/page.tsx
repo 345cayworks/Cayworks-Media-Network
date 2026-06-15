@@ -10,9 +10,10 @@ import {
   deleteCampaign,
   cloneCampaign,
   setCampaignPlacementStatus,
+  bulkAttachCreativesToCampaign,
 } from "../actions";
 import { DeleteButton } from "@/components/DeleteButton";
-import { deleteCreative } from "@/app/admin/creatives/actions";
+import { detachCreativeFromCampaign } from "@/app/admin/creatives/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +27,28 @@ export default async function CampaignDetailPage({
     where: { id: params.id },
     include: {
       advertiser: true,
-      creatives: { orderBy: { createdAt: "desc" } },
+      creativeLinks: {
+        include: { creative: true },
+        orderBy: { createdAt: "desc" },
+      },
       campaignPlacements: {
         include: { placement: { include: { platform: true } } },
       },
     },
   });
   if (!c) notFound();
+  const linkedCreativeIds = new Set(c.creativeLinks.map((l) => l.creativeId));
+  const attachableCreatives = await prisma.creative.findMany({
+    where: { id: { notIn: [...linkedCreativeIds] } },
+    select: {
+      id: true,
+      title: true,
+      creativeType: true,
+      approvalStatus: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
 
   const assignedIds = new Set(c.campaignPlacements.map((p) => p.placementId));
   const allPlacements = await prisma.adPlacement.findMany({
@@ -115,16 +131,16 @@ export default async function CampaignDetailPage({
       <div className="mt-6 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-700">Creatives</h2>
         <LinkButton
-          href={`/admin/creatives/new?campaignId=${c.id}`}
+          href={`/admin/creatives/new?attachTo=${c.id}`}
           variant="secondary"
         >
-          Add Creative
+          Upload new creative
         </LinkButton>
       </div>
       <div className="card mt-2 overflow-x-auto">
-        {c.creatives.length === 0 ? (
+        {c.creativeLinks.length === 0 ? (
           <div className="p-4">
-            <EmptyState message="No creatives yet." />
+            <EmptyState message="No creatives attached yet. Attach an existing one below or upload a new asset." />
           </div>
         ) : (
           <table className="w-full">
@@ -133,13 +149,15 @@ export default async function CampaignDetailPage({
                 <th className="th">Title</th>
                 <th className="th">Type</th>
                 <th className="th">Approval</th>
-                <th className="th">Status</th>
+                <th className="th">Link</th>
                 <th className="th"></th>
               </tr>
             </thead>
             <tbody>
-              {c.creatives.map((cr) => (
-                <tr key={cr.id} className="border-b border-slate-50">
+              {c.creativeLinks.map((l) => {
+                const cr = l.creative;
+                return (
+                <tr key={l.id} className="border-b border-slate-50">
                   <td className="td font-medium">
                     <Link
                       href={`/admin/creatives/${cr.id}`}
@@ -153,21 +171,62 @@ export default async function CampaignDetailPage({
                     <Badge value={cr.approvalStatus} />
                   </td>
                   <td className="td">
-                    <Badge value={cr.status} />
+                    <Badge value={l.status} />
                   </td>
                   <td className="td text-right">
-                    <DeleteButton
-                      action={deleteCreative.bind(null, cr.id)}
-                      label="Remove"
-                      confirmText={`Remove creative "${cr.title}" from this campaign? It will be deleted along with its impressions and clicks. This cannot be undone.`}
-                    />
+                    <form
+                      action={detachCreativeFromCampaign.bind(
+                        null,
+                        cr.id,
+                        c.id,
+                      )}
+                    >
+                      <button className="btn-secondary" type="submit">
+                        Detach
+                      </button>
+                    </form>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
+
+      {attachableCreatives.length > 0 && (
+        <form
+          action={bulkAttachCreativesToCampaign.bind(null, c.id)}
+          className="card mt-3 p-4"
+        >
+          <div className="label mb-2">Attach existing creatives</div>
+          <div className="grid max-h-56 gap-1 overflow-y-auto rounded-md border border-slate-100 p-2 sm:grid-cols-2">
+            {attachableCreatives.map((cr) => (
+              <label
+                key={cr.id}
+                className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  name="creativeId"
+                  value={cr.id}
+                  className="h-3.5 w-3.5"
+                />
+                <span className="truncate font-medium text-slate-800">
+                  {cr.title}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {cr.creativeType}
+                </span>
+                <Badge value={cr.approvalStatus} />
+              </label>
+            ))}
+          </div>
+          <button type="submit" className="btn-primary mt-2">
+            Attach selected
+          </button>
+        </form>
+      )}
 
       {/* Placements */}
       <h2 className="mt-6 text-sm font-semibold text-slate-700">

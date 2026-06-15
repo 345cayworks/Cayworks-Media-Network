@@ -107,7 +107,16 @@ const CAMPAIGN_LINK_INCLUDE = {
   campaign: {
     include: {
       advertiser: true,
-      creatives: { where: { approvalStatus: "APPROVED", status: "ACTIVE" } },
+      // Creatives flow through the m2m join. Filter on both the link being
+      // ACTIVE and the underlying creative being APPROVED + ACTIVE so the
+      // returned list is already eligible.
+      creativeLinks: {
+        where: {
+          status: "ACTIVE",
+          creative: { approvalStatus: "APPROVED", status: "ACTIVE" },
+        },
+        include: { creative: true },
+      },
     },
   },
 } satisfies Prisma.CampaignPlacementInclude;
@@ -115,7 +124,7 @@ const CAMPAIGN_LINK_INCLUDE = {
 type CampaignLink = Prisma.CampaignPlacementGetPayload<{
   include: typeof CAMPAIGN_LINK_INCLUDE;
 }>;
-type Creative = CampaignLink["campaign"]["creatives"][number];
+type Creative = CampaignLink["campaign"]["creativeLinks"][number]["creative"];
 type Candidate = {
   link: CampaignLink;
   weight: number;
@@ -164,7 +173,7 @@ async function gatherCandidates(
 
   for (const link of links) {
     const campaign = link.campaign;
-    if (campaign.creatives.length === 0) continue;
+    if (campaign.creativeLinks.length === 0) continue;
     if (campaign.advertiser.status !== "ACTIVE") continue;
     if (campaign.advertiser.billingStatus === "ON_HOLD") continue;
 
@@ -208,7 +217,8 @@ async function gatherCandidates(
     }
 
     const weight = Math.max(1, campaign.priority) * Math.max(1, link.weight);
-    const bestCreatives = filterBestCreatives(campaign.creatives, sizes);
+    const eligibleCreatives = campaign.creativeLinks.map((l) => l.creative);
+    const bestCreatives = filterBestCreatives(eligibleCreatives, sizes);
     candidates.push({ link, weight, bestCreatives });
   }
 

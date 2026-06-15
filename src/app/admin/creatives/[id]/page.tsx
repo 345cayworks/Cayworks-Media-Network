@@ -3,7 +3,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getSessionUser, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, Badge, LinkButton } from "@/components/ui";
-import { setApproval, deleteCreative } from "../actions";
+import {
+  setApproval,
+  deleteCreative,
+  attachCreativeToCampaign,
+  detachCreativeFromCampaign,
+} from "../actions";
 import { resolveVideo } from "@/lib/media";
 import { DeleteButton } from "@/components/DeleteButton";
 
@@ -21,23 +26,43 @@ export default async function CreativeDetailPage({
   const cr = await prisma.creative.findUnique({
     where: { id: params.id },
     include: {
-      campaign: { include: { advertiser: true } },
+      campaignLinks: {
+        include: {
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              advertiser: { select: { businessName: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!cr) notFound();
   const video = resolveVideo(cr.videoUrl);
 
+  const linkedIds = new Set(cr.campaignLinks.map((l) => l.campaignId));
+  const attachable = await prisma.campaign.findMany({
+    where: { id: { notIn: [...linkedIds] } },
+    select: {
+      id: true,
+      name: true,
+      advertiser: { select: { businessName: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
   return (
     <div>
       <PageHeader
         title={cr.title}
-        subtitle={`${cr.campaign.name} · ${cr.campaign.advertiser.businessName}`}
+        subtitle={`${cr.creativeType}${cr.width && cr.height ? ` · ${cr.width}×${cr.height}` : ""}`}
         action={
           <div className="flex flex-wrap gap-2">
-            <LinkButton
-              href={`/admin/creatives/${cr.id}/edit`}
-              variant="secondary"
-            >
+            <LinkButton href={`/admin/creatives/${cr.id}/edit`} variant="secondary">
               Edit
             </LinkButton>
             {canApprove && (
@@ -61,7 +86,7 @@ export default async function CreativeDetailPage({
                 <DeleteButton
                   action={deleteCreative.bind(null, cr.id)}
                   label="Delete"
-                  confirmText={`Permanently delete creative "${cr.title}"? Impressions and clicks for this creative will also be removed. This cannot be undone.`}
+                  confirmText={`Permanently delete creative "${cr.title}"? It will be removed from ALL ${cr.campaignLinks.length} campaigns it's attached to, along with its impressions and clicks. This cannot be undone.`}
                 />
               </>
             )}
@@ -115,30 +140,94 @@ export default async function CreativeDetailPage({
           </div>
         </div>
 
-        <div className="card space-y-3 p-4 text-sm">
-          <Row label="Approval">
-            <Badge value={cr.approvalStatus} />
-          </Row>
-          <Row label="Status">
-            <Badge value={cr.status} />
-          </Row>
-          <Row label="Type">{cr.creativeType}</Row>
-          <Row label="Dimensions">
-            {cr.width && cr.height ? `${cr.width}×${cr.height}` : "—"}
-          </Row>
-          <Row label="Destination">
-            <span className="break-all text-brand-600">
-              {cr.destinationUrl}
-            </span>
-          </Row>
-          <Row label="Campaign">
-            <Link
-              href={`/admin/campaigns/${cr.campaignId}`}
-              className="text-brand-600 hover:underline"
-            >
-              {cr.campaign.name}
-            </Link>
-          </Row>
+        <div className="space-y-4">
+          <div className="card p-4 text-sm space-y-3">
+            <Row label="Approval">
+              <Badge value={cr.approvalStatus} />
+            </Row>
+            <Row label="Status">
+              <Badge value={cr.status} />
+            </Row>
+            <Row label="Destination">
+              <span className="break-all text-brand-600">{cr.destinationUrl}</span>
+            </Row>
+            <Row label="Campaigns">
+              <span className="text-slate-700">{cr.campaignLinks.length}</span>
+            </Row>
+          </div>
+
+          <div className="card p-4">
+            <div className="mb-2 text-sm font-semibold text-slate-700">
+              Attached to campaigns
+            </div>
+            {cr.campaignLinks.length === 0 ? (
+              <div className="text-xs text-slate-400">
+                Not attached to any campaign yet.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {cr.campaignLinks.map((l) => (
+                  <li
+                    key={l.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-slate-100 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        href={`/admin/campaigns/${l.campaign.id}`}
+                        className="font-medium text-brand-600 hover:underline"
+                      >
+                        {l.campaign.name}
+                      </Link>
+                      <div className="text-xs text-slate-400">
+                        {l.campaign.advertiser.businessName}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge value={l.status} />
+                      <form
+                        action={detachCreativeFromCampaign.bind(
+                          null,
+                          cr.id,
+                          l.campaignId,
+                        )}
+                      >
+                        <button className="btn-secondary" type="submit">
+                          Detach
+                        </button>
+                      </form>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {attachable.length > 0 && (
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  const id = String(formData.get("campaignId") ?? "");
+                  if (id) await attachCreativeToCampaign(cr.id, id);
+                }}
+                className="mt-3 flex items-end gap-2"
+              >
+                <div className="flex-1">
+                  <label className="label" htmlFor="campaignId">
+                    Attach to campaign
+                  </label>
+                  <select id="campaignId" name="campaignId" className="input">
+                    {attachable.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} — {c.advertiser.businessName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button type="submit" className="btn-primary">
+                  Attach
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -153,7 +242,7 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-slate-50 pb-2">
+    <div className="flex items-center justify-between gap-4 border-b border-slate-50 pb-2 last:border-0 last:pb-0">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </span>

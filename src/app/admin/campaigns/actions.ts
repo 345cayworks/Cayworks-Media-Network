@@ -81,15 +81,19 @@ export async function deleteCampaign(id: string) {
   redirect("/admin/campaigns");
 }
 
-export async function cloneCampaign(id: string) {
-  // Duplicate the campaign (DRAFT) plus its creatives and placement
-  // assignments. Link statuses are copied from the source — the cloned
-  // campaign itself is DRAFT, so selection won't serve from it until an
-  // admin activates the campaign.
+export async function cloneCampaign(id: string, formData?: FormData) {
+  // Duplicate the campaign (DRAFT) plus its placement assignments. By
+  // default the cloned campaign LINKS to the source's creatives (m2m), so
+  // edits to a creative propagate everywhere it's used. Pass
+  // `separateCreatives=1` to instead duplicate the creative rows.
   const user = await requireRole(STAFF_ROLES);
+  const separate = formData?.get("separateCreatives") === "1";
   const src = await prisma.campaign.findUnique({
     where: { id },
-    include: { creatives: true, campaignPlacements: true },
+    include: {
+      creativeLinks: { include: { creative: true } },
+      campaignPlacements: true,
+    },
   });
   if (!src) redirect("/admin/campaigns");
 
@@ -111,24 +115,47 @@ export async function cloneCampaign(id: string) {
         frequencyCapPerUserPerDay: src.frequencyCapPerUserPerDay,
       },
     });
-    if (src.creatives.length > 0) {
-      await tx.creative.createMany({
-        data: src.creatives.map((cr) => ({
-          campaignId: c.id,
-          title: cr.title,
-          description: cr.description,
-          imageUrl: cr.imageUrl,
-          videoUrl: cr.videoUrl,
-          destinationUrl: cr.destinationUrl,
-          ctaText: cr.ctaText,
-          creativeType: cr.creativeType,
-          width: cr.width,
-          height: cr.height,
-          approvalStatus: cr.approvalStatus,
-          status: cr.status,
-        })),
-      });
+
+    if (src.creativeLinks.length > 0) {
+      if (separate) {
+        for (const l of src.creativeLinks) {
+          const cr = l.creative;
+          const dup = await tx.creative.create({
+            data: {
+              title: cr.title,
+              description: cr.description,
+              imageUrl: cr.imageUrl,
+              videoUrl: cr.videoUrl,
+              destinationUrl: cr.destinationUrl,
+              ctaText: cr.ctaText,
+              creativeType: cr.creativeType,
+              width: cr.width,
+              height: cr.height,
+              approvalStatus: cr.approvalStatus,
+              status: cr.status,
+            },
+          });
+          await tx.campaignCreative.create({
+            data: {
+              campaignId: c.id,
+              creativeId: dup.id,
+              status: l.status,
+              weight: l.weight,
+            },
+          });
+        }
+      } else {
+        await tx.campaignCreative.createMany({
+          data: src.creativeLinks.map((l) => ({
+            campaignId: c.id,
+            creativeId: l.creativeId,
+            status: l.status,
+            weight: l.weight,
+          })),
+        });
+      }
     }
+
     if (src.campaignPlacements.length > 0) {
       await tx.campaignPlacement.createMany({
         data: src.campaignPlacements.map((cp) => ({
@@ -142,9 +169,66 @@ export async function cloneCampaign(id: string) {
     return c;
   });
 
-  await audit(user, "CLONE", "Campaign", cloned.id, { sourceId: id });
+  await audit(user, "CLONE", "Campaign", cloned.id, {
+    sourceId: id,
+    creativeMode: separate ? "separate" : "linked",
+  });
   revalidatePath("/admin/campaigns");
   redirect(`/admin/campaigns/${cloned.id}`);
+}
+
+/** Attach many creatives to a campaign at once (idempotent). */
+export async function bulkAttachCreativesToCampaign(
+  campaignId: string,
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("creativeId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath(`/admin/campaigns/${campaignId}`);
+    return;
+  }
+  for (const creativeId of ids) {
+    await prisma.campaignCreative.upsert({
+      where: { campaignId_creativeId: { campaignId, creativeId } },
+      create: { campaignId, creativeId, status: "ACTIVE", weight: 1 },
+      update: { status: "ACTIVE" },
+    });
+  }
+  await audit(user, "ATTACH_BULK", "Campaign", campaignId, {
+    count: ids.length,
+  });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+}
+
+/** Bulk-assign many placements to a campaign in one submit (idempotent). */
+export async function bulkAssignPlacements(
+  campaignId: string,
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("placementId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath(`/admin/campaigns/${campaignId}`);
+    return;
+  }
+  for (const placementId of ids) {
+    await prisma.campaignPlacement.upsert({
+      where: { campaignId_placementId: { campaignId, placementId } },
+      create: { campaignId, placementId, weight: 1, status: "ACTIVE" },
+      update: { status: "ACTIVE" },
+    });
+  }
+  await audit(user, "ASSIGN_PLACEMENT_BULK", "Campaign", campaignId, {
+    count: ids.length,
+  });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
 }
 
 export async function setCampaignPlacementStatus(
