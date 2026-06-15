@@ -14,6 +14,8 @@ import {
   setCampaignPlacementStatus,
   bulkAttachCreativesToCampaign,
   bulkAssignPlacements,
+  bulkSetCampaignPlacementStatus,
+  bulkRemoveCampaignPlacements,
 } from "../actions";
 import { Meter } from "@/components/Meter";
 import { DeleteButton } from "@/components/DeleteButton";
@@ -391,9 +393,13 @@ export default async function CampaignDetailPage({
             <EmptyState message="Not assigned to any placement yet." />
           </div>
         ) : (
+          <form
+            action={bulkSetCampaignPlacementStatus.bind(null, c.id, "ACTIVE")}
+          >
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
+                <th className="th w-8"></th>
                 <th className="th">Placement</th>
                 <th className="th">Platform</th>
                 <th className="th">Weight</th>
@@ -404,8 +410,17 @@ export default async function CampaignDetailPage({
             <tbody>
               {c.campaignPlacements.map((cp) => {
                 const e = eligibilityByPlacement.get(cp.placementId);
+                const nextLink = cp.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
                 return (
                 <tr key={cp.id} className="border-b border-slate-50">
+                  <td className="td">
+                    <input
+                      type="checkbox"
+                      name="placementId"
+                      value={cp.placementId}
+                      className="h-3.5 w-3.5"
+                    />
+                  </td>
                   <td className="td font-medium">
                     {cp.placement.name}
                     <div className="text-xs text-slate-400">
@@ -438,29 +453,29 @@ export default async function CampaignDetailPage({
                   </td>
                   <td className="td text-right">
                     <div className="flex flex-wrap justify-end gap-1">
-                      <form
-                        action={setCampaignPlacementStatus.bind(
+                      <button
+                        type="submit"
+                        formAction={setCampaignPlacementStatus.bind(
                           null,
                           c.id,
                           cp.placementId,
-                          cp.status === "ACTIVE" ? "PAUSED" : "ACTIVE",
+                          nextLink,
                         )}
+                        className="btn-secondary"
                       >
-                        <button className="btn-secondary" type="submit">
-                          {cp.status === "ACTIVE" ? "Pause" : "Reactivate"}
-                        </button>
-                      </form>
-                      <form
-                        action={removePlacement.bind(
+                        {cp.status === "ACTIVE" ? "Pause" : "Reactivate"}
+                      </button>
+                      <button
+                        type="submit"
+                        formAction={removePlacement.bind(
                           null,
                           c.id,
                           cp.placementId,
                         )}
+                        className="btn-danger"
                       >
-                        <button className="btn-danger" type="submit">
-                          Remove
-                        </button>
-                      </form>
+                        Remove
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -468,6 +483,29 @@ export default async function CampaignDetailPage({
               })}
             </tbody>
           </table>
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-3 py-2 text-xs">
+            <span className="mr-auto text-slate-500">
+              Bulk action applies to every ticked placement.
+            </span>
+            <button type="submit" className="btn-secondary">
+              Reactivate
+            </button>
+            <button
+              type="submit"
+              formAction={bulkSetCampaignPlacementStatus.bind(null, c.id, "PAUSED")}
+              className="btn-secondary"
+            >
+              Pause
+            </button>
+            <ConfirmFormButton
+              action={bulkRemoveCampaignPlacements.bind(null, c.id)}
+              className="btn-danger"
+              confirmText="Remove the selected placement assignments from this campaign? The placements themselves are kept."
+            >
+              Remove
+            </ConfirmFormButton>
+          </div>
+          </form>
         )}
       </div>
 

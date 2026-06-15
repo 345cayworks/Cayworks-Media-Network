@@ -5,6 +5,27 @@ import { requireRole, ADMIN_ROLES } from "@/lib/auth";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { FilterChips } from "@/components/FilterChips";
 import { Pagination, readPaging } from "@/components/Pagination";
+import { SortHeader } from "@/components/SortHeader";
+
+type SortKey = "when" | "action" | "entity" | "actor";
+const SORTABLE: ReadonlySet<SortKey> = new Set([
+  "when",
+  "action",
+  "entity",
+  "actor",
+]);
+function orderByFor(sort: SortKey, dir: "asc" | "desc") {
+  switch (sort) {
+    case "action":
+      return { action: dir } as const;
+    case "entity":
+      return { entity: dir } as const;
+    case "actor":
+      return { actorEmail: dir } as const;
+    default:
+      return { createdAt: dir } as const;
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +51,8 @@ export default async function AuditPage({
     to?: string;
     page?: string;
     pageSize?: string;
+    sort?: string;
+    dir?: string;
   };
 }) {
   await requireRole(ADMIN_ROLES);
@@ -53,11 +76,16 @@ export default async function AuditPage({
   }
   if (Object.keys(range).length > 0) where.createdAt = range;
 
+  const sort: SortKey = SORTABLE.has(searchParams.sort as SortKey)
+    ? (searchParams.sort as SortKey)
+    : "when";
+  const dir: "asc" | "desc" = searchParams.dir === "asc" ? "asc" : "desc";
+
   const paging = readPaging(searchParams, 25, 200);
   const [logs, total] = await Promise.all([
     prisma.auditLog.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: orderByFor(sort, dir),
       skip: paging.skip,
       take: paging.pageSize,
     }),
@@ -173,10 +201,10 @@ export default async function AuditPage({
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">When</th>
-                <th className="th">Actor</th>
-                <th className="th">Action</th>
-                <th className="th">Entity</th>
+                <SortHeader label="When" k="when" current={sort} dir={dir} basePath="/admin/audit" preserve={searchParams} />
+                <SortHeader label="Actor" k="actor" current={sort} dir={dir} basePath="/admin/audit" preserve={searchParams} />
+                <SortHeader label="Action" k="action" current={sort} dir={dir} basePath="/admin/audit" preserve={searchParams} />
+                <SortHeader label="Entity" k="entity" current={sort} dir={dir} basePath="/admin/audit" preserve={searchParams} />
                 <th className="th">Entity ID</th>
               </tr>
             </thead>

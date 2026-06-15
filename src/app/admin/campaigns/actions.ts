@@ -271,6 +271,52 @@ export async function setCampaignPlacementStatus(
   revalidatePath(`/admin/campaigns/${campaignId}`);
 }
 
+export async function bulkSetCampaignPlacementStatus(
+  campaignId: string,
+  status: "ACTIVE" | "PAUSED",
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("placementId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath(`/admin/campaigns/${campaignId}`);
+    return;
+  }
+  await prisma.campaignPlacement.updateMany({
+    where: { campaignId, placementId: { in: ids } },
+    data: { status },
+  });
+  await audit(user, `LINK_BULK_${status}`, "CampaignPlacement", campaignId, {
+    count: ids.length,
+  });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+}
+
+export async function bulkRemoveCampaignPlacements(
+  campaignId: string,
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const ids = formData
+    .getAll("placementId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath(`/admin/campaigns/${campaignId}`);
+    return;
+  }
+  await prisma.campaignPlacement.deleteMany({
+    where: { campaignId, placementId: { in: ids } },
+  });
+  await audit(user, "REMOVE_PLACEMENT_BULK", "Campaign", campaignId, {
+    count: ids.length,
+  });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+}
+
 export async function removePlacement(campaignId: string, placementId: string) {
   const user = await requireRole(STAFF_ROLES);
   await prisma.campaignPlacement.deleteMany({
