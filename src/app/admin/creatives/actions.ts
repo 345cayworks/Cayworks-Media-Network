@@ -87,6 +87,31 @@ export async function setApproval(
   revalidatePath("/admin/approvals");
 }
 
+/** Create a new creative and attach it to a campaign in one shot. Used by
+ *  the drop-zone uploader on the campaign detail page. */
+export async function createAndAttachCreative(
+  campaignId: string,
+  formData: FormData,
+) {
+  const user = await requireRole(STAFF_ROLES);
+  const parsed = parse(formData);
+  if (!parsed.success) {
+    redirect(
+      `/admin/campaigns/${campaignId}?error=${encodeURIComponent(parsed.error.errors[0].message)}`,
+    );
+  }
+  const cr = await prisma.creative.create({ data: parsed.data });
+  await prisma.campaignCreative.upsert({
+    where: { campaignId_creativeId: { campaignId, creativeId: cr.id } },
+    create: { campaignId, creativeId: cr.id, status: "ACTIVE", weight: 1 },
+    update: { status: "ACTIVE" },
+  });
+  await audit(user, "CREATE_AND_ATTACH", "Creative", cr.id, { campaignId });
+  revalidatePath(`/admin/campaigns/${campaignId}`);
+  revalidatePath("/admin/creatives");
+  redirect(`/admin/campaigns/${campaignId}`);
+}
+
 /** Attach an existing creative to a campaign (idempotent, ACTIVE link). */
 export async function attachCreativeToCampaign(
   creativeId: string,

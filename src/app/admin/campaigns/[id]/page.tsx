@@ -17,7 +17,11 @@ import {
 } from "../actions";
 import { Meter } from "@/components/Meter";
 import { DeleteButton } from "@/components/DeleteButton";
-import { detachCreativeFromCampaign } from "@/app/admin/creatives/actions";
+import {
+  detachCreativeFromCampaign,
+  createAndAttachCreative,
+} from "@/app/admin/creatives/actions";
+import { DropToAttach } from "@/components/DropToAttach";
 
 export const dynamic = "force-dynamic";
 
@@ -239,6 +243,11 @@ export default async function CampaignDetailPage({
             </tbody>
           </table>
         )}
+      </div>
+
+      <div className="card mt-3 p-4">
+        <div className="label mb-2">Drop a file to add a creative</div>
+        <DropToAttach action={createAndAttachCreative.bind(null, c.id)} />
       </div>
 
       {attachableCreatives.length > 0 && (
