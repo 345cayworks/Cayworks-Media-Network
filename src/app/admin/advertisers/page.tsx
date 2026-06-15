@@ -7,6 +7,7 @@ import { BulkToolbar } from "@/components/BulkToolbar";
 import { SortHeader } from "@/components/SortHeader";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import { Pagination, readPaging } from "@/components/Pagination";
+import { SearchInput } from "@/components/SearchInput";
 import {
   bulkSetAdvertiserStatus,
   bulkDeleteAdvertisers,
@@ -142,43 +143,12 @@ export default async function AdvertisersPage({
       />
 
       <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
-        <form className="flex flex-1 min-w-[220px] items-end gap-2" method="get">
-          {searchParams.sort && (
-            <input type="hidden" name="sort" value={searchParams.sort} />
-          )}
-          {searchParams.dir && (
-            <input type="hidden" name="dir" value={searchParams.dir} />
-          )}
-          <div className="flex-1">
-            <label className="label" htmlFor="q">
-              Search
-            </label>
-            <input
-              id="q"
-              name="q"
-              type="search"
-              defaultValue={q}
-              placeholder="Business, contact or email…"
-              className="input"
-            />
-          </div>
-          <button type="submit" className="btn-secondary">
-            Search
-          </button>
-          {q && (
-            <Link
-              href={(() => {
-                const p = new URLSearchParams();
-                if (searchParams.sort) p.set("sort", searchParams.sort);
-                if (searchParams.dir) p.set("dir", searchParams.dir);
-                return p.toString() ? `/admin/advertisers?${p.toString()}` : "/admin/advertisers";
-              })()}
-              className="btn-secondary"
-            >
-              Clear
-            </Link>
-          )}
-        </form>
+        <SearchInput
+          basePath="/admin/advertisers"
+          defaultValue={q}
+          placeholder="Business, contact or email…"
+          preserve={searchParams}
+        />
       </div>
 
       {advertisers.length === 0 ? (

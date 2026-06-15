@@ -6,6 +6,7 @@ import { PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import { BulkToolbar } from "@/components/BulkToolbar";
 import { FilterChips } from "@/components/FilterChips";
+import { SearchInput } from "@/components/SearchInput";
 import { Pagination, readPaging } from "@/components/Pagination";
 import {
   bulkDeleteCreatives,
@@ -63,6 +64,7 @@ export default async function CreativesPage({
     sort?: string;
     page?: string;
     pageSize?: string;
+    orphan?: string;
   };
 }) {
   await requireUser();
@@ -76,6 +78,10 @@ export default async function CreativesPage({
   }
   const q = (searchParams.q ?? "").trim();
   if (q) where.title = { contains: q, mode: "insensitive" };
+  // ?orphan=1 → only creatives with zero campaign links (cleanup view).
+  if (searchParams.orphan === "1") {
+    where.campaignLinks = { none: {} };
+  }
 
   const sort: Sort = (SORTS.find((s) => s.key === searchParams.sort)?.key ??
     "newest") as Sort;
@@ -102,19 +108,6 @@ export default async function CreativesPage({
     take: 200,
   });
 
-  const baseQs = new URLSearchParams();
-  if (q) baseQs.set("q", q);
-  if (searchParams.approval) baseQs.set("approval", searchParams.approval);
-  if (searchParams.type) baseQs.set("type", searchParams.type);
-  if (sort !== "newest") baseQs.set("sort", sort);
-
-  function withParam(key: string, value: string | undefined): string {
-    const p = new URLSearchParams(baseQs);
-    if (value) p.set(key, value);
-    else p.delete(key);
-    return `/admin/creatives?${p.toString()}`;
-  }
-
   return (
     <div>
       <PageHeader
@@ -124,36 +117,12 @@ export default async function CreativesPage({
       />
 
       <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
-        <form className="flex flex-1 min-w-[200px] items-end gap-2" method="get">
-          {/* preserve other filters when searching */}
-          {searchParams.approval && (
-            <input type="hidden" name="approval" value={searchParams.approval} />
-          )}
-          {searchParams.type && (
-            <input type="hidden" name="type" value={searchParams.type} />
-          )}
-          <div className="flex-1">
-            <label className="label" htmlFor="q">
-              Search
-            </label>
-            <input
-              id="q"
-              name="q"
-              type="search"
-              defaultValue={q}
-              placeholder="Title contains…"
-              className="input"
-            />
-          </div>
-          <button type="submit" className="btn-secondary">
-            Search
-          </button>
-          {q && (
-            <Link href={withParam("q", undefined)} className="btn-secondary">
-              Clear
-            </Link>
-          )}
-        </form>
+        <SearchInput
+          basePath="/admin/creatives"
+          defaultValue={q}
+          placeholder="Title contains…"
+          preserve={searchParams}
+        />
 
         <FilterChips
           label="Type"
@@ -196,6 +165,15 @@ export default async function CreativesPage({
           basePath="/admin/creatives"
           items={APPROVAL_FILTERS.map((a) => ({ value: a }))}
           active={searchParams.approval}
+          preserve={searchParams}
+        />
+
+        <FilterChips
+          label="Usage"
+          name="orphan"
+          basePath="/admin/creatives"
+          items={[{ value: "1", label: "Orphaned" }]}
+          active={searchParams.orphan}
           preserve={searchParams}
         />
       </div>

@@ -8,6 +8,7 @@ import { ConfirmFormButton } from "@/components/ConfirmFormButton";
 import { BulkToolbar } from "@/components/BulkToolbar";
 import { SortHeader } from "@/components/SortHeader";
 import { FilterChips } from "@/components/FilterChips";
+import { SearchInput } from "@/components/SearchInput";
 import { Pagination, readPaging } from "@/components/Pagination";
 import {
   bulkSetCampaignStatus,
@@ -136,47 +137,12 @@ export default async function CampaignsPage({
         action={<LinkButton href="/admin/campaigns/new">New Campaign</LinkButton>}
       />
       <div className="card mb-4 flex flex-wrap items-end gap-3 p-3">
-        <form className="flex flex-1 min-w-[220px] items-end gap-2" method="get">
-          {searchParams.sort && (
-            <input type="hidden" name="sort" value={searchParams.sort} />
-          )}
-          {searchParams.dir && (
-            <input type="hidden" name="dir" value={searchParams.dir} />
-          )}
-          {searchParams.state && (
-            <input type="hidden" name="state" value={searchParams.state} />
-          )}
-          <div className="flex-1">
-            <label className="label" htmlFor="q">
-              Search
-            </label>
-            <input
-              id="q"
-              name="q"
-              type="search"
-              defaultValue={q}
-              placeholder="Campaign name or advertiser…"
-              className="input"
-            />
-          </div>
-          <button type="submit" className="btn-secondary">
-            Search
-          </button>
-          {q && (
-            <Link
-              href={(() => {
-                const p = new URLSearchParams();
-                if (searchParams.sort) p.set("sort", searchParams.sort);
-                if (searchParams.dir) p.set("dir", searchParams.dir);
-                if (searchParams.state) p.set("state", searchParams.state);
-                return p.toString() ? `/admin/campaigns?${p.toString()}` : "/admin/campaigns";
-              })()}
-              className="btn-secondary"
-            >
-              Clear
-            </Link>
-          )}
-        </form>
+        <SearchInput
+          basePath="/admin/campaigns"
+          defaultValue={q}
+          placeholder="Campaign name or advertiser…"
+          preserve={searchParams}
+        />
         <FilterChips
           label="State"
           name="state"
