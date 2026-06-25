@@ -62,6 +62,15 @@ enum CampaignStatus {
   ENDED
 }
 
+// Gates auto-publish: when a campaign goes ACTIVE it is auto-assigned to every
+// ACTIVE placement whose placementType matches this value (and vice-versa when
+// a placement is activated). A strict subset of PlacementType by design.
+enum CampaignType {
+  BANNER
+  CARD
+  NATIVE
+}
+
 enum PricingModel {
   CPM
   CPC
@@ -226,6 +235,8 @@ model Campaign {
   advertiser           Advertiser        @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
   name                 String
   objective            CampaignObjective @default(TRAFFIC)
+  // Drives auto-publish to matching-type placements on activation.
+  campaignType         CampaignType      @default(BANNER)
   startDate            DateTime
   endDate              DateTime
   budget               Decimal           @default(0) @db.Decimal(12, 2)

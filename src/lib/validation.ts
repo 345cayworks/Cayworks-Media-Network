@@ -64,6 +64,7 @@ export const campaignSchema = z
     advertiserId: z.string().min(1, "Advertiser is required"),
     name: z.string().trim().min(1, "Name is required"),
     objective: z.enum(["AWARENESS", "TRAFFIC", "LEADS", "CONVERSIONS"]),
+    campaignType: z.enum(["BANNER", "CARD", "NATIVE"]),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
     budget: z.coerce.number().min(0),

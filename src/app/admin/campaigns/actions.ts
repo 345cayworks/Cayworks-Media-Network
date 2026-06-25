@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ROLES, STAFF_ROLES } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { campaignSchema } from "@/lib/validation";
+import { autoPublishCampaign } from "@/lib/auto-publish";
 
 function parse(formData: FormData) {
   const raw = Object.fromEntries(formData);
@@ -25,6 +26,8 @@ export async function createCampaign(formData: FormData) {
   }
   const c = await prisma.campaign.create({ data: parsed.data });
   await audit(user, "CREATE", "Campaign", c.id, { name: c.name });
+  // Created directly as ACTIVE → publish to matching placements immediately.
+  if (c.status === "ACTIVE") await autoPublishCampaign(c.id, user);
   revalidatePath("/admin/campaigns");
   redirect(`/admin/campaigns/${c.id}`);
 }
@@ -37,6 +40,8 @@ export async function updateCampaign(id: string, formData: FormData) {
   }
   await prisma.campaign.update({ where: { id }, data: parsed.data });
   await audit(user, "UPDATE", "Campaign", id);
+  // Edit form can flip status to ACTIVE (or change the type) — re-publish.
+  if (parsed.data.status === "ACTIVE") await autoPublishCampaign(id, user);
   revalidatePath(`/admin/campaigns/${id}`);
   redirect(`/admin/campaigns/${id}`);
 }
@@ -48,6 +53,8 @@ export async function setCampaignStatus(
   const user = await requireRole(STAFF_ROLES);
   await prisma.campaign.update({ where: { id }, data: { status } });
   await audit(user, `STATUS_${status}`, "Campaign", id);
+  // Activating publishes the campaign to all matching active placements.
+  if (status === "ACTIVE") await autoPublishCampaign(id, user);
   revalidatePath(`/admin/campaigns/${id}`);
   revalidatePath("/admin/campaigns");
 }
@@ -72,6 +79,10 @@ export async function bulkSetCampaignStatus(
   await audit(user, `STATUS_BULK_${status}`, "Campaign", null, {
     count: ids.length,
   });
+  // Activating in bulk publishes each to its matching active placements.
+  if (status === "ACTIVE") {
+    for (const id of ids) await autoPublishCampaign(id, user);
+  }
   revalidatePath("/admin/campaigns");
 }
 

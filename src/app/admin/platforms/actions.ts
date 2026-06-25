@@ -8,6 +8,7 @@ import { audit } from "@/lib/audit";
 import { generateApiKey } from "@/lib/api-key";
 import { stashKey } from "@/lib/platform-key-flash";
 import { platformSchema, placementSchema } from "@/lib/validation";
+import { autoPublishPlacement } from "@/lib/auto-publish";
 
 export async function createPlatform(formData: FormData) {
   const user = await requireRole(ADMIN_ROLES);
@@ -126,10 +127,12 @@ export async function createPlacement(platformId: string, formData: FormData) {
   if (!parsed.success) {
     redirect(`/admin/platforms/${platformId}?error=${encodeURIComponent(parsed.error.errors[0].message)}`);
   }
-  await prisma.adPlacement.create({ data: parsed.data });
+  const placement = await prisma.adPlacement.create({ data: parsed.data });
   await audit(user, "CREATE", "AdPlacement", platformId, {
     placementKey: parsed.data.placementKey,
   });
+  // A placement created ACTIVE back-fills onto matching active campaigns.
+  if (placement.status === "ACTIVE") await autoPublishPlacement(placement.id, user);
   revalidatePath(`/admin/platforms/${platformId}`);
 }
 
@@ -141,6 +144,8 @@ export async function setPlacementStatus(
   const user = await requireRole(ADMIN_ROLES);
   await prisma.adPlacement.update({ where: { id: placementId }, data: { status } });
   await audit(user, `PLACEMENT_${status}`, "AdPlacement", placementId);
+  // Activating a placement back-fills it onto matching active campaigns.
+  if (status === "ACTIVE") await autoPublishPlacement(placementId, user);
   revalidatePath(`/admin/platforms/${platformId}`);
 }
 
@@ -169,6 +174,8 @@ export async function updatePlacement(
     },
   });
   await audit(user, "UPDATE", "AdPlacement", placementId);
+  // Edit can flip the placement to ACTIVE or change its type — back-fill.
+  if (parsed.data.status === "ACTIVE") await autoPublishPlacement(placementId, user);
   revalidatePath(`/admin/platforms/${platformId}`);
   redirect(`/admin/platforms/${platformId}`);
 }
