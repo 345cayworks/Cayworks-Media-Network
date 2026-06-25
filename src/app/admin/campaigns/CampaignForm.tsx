@@ -63,12 +63,6 @@ export function CampaignForm({
           defaultValue={campaign?.objective}
         />
         <Select
-          label="Type (auto-publishes to matching placements)"
-          name="campaignType"
-          options={enumOptions(["BANNER", "CARD", "NATIVE"])}
-          defaultValue={campaign?.campaignType}
-        />
-        <Select
           label="Pricing Model"
           name="pricingModel"
           options={enumOptions(["CPM", "CPC", "FLAT", "HOUSE"])}

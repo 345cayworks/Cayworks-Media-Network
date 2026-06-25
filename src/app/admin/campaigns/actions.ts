@@ -236,6 +236,8 @@ export async function bulkAttachCreativesToCampaign(
   await audit(user, "ATTACH_BULK", "Campaign", campaignId, {
     count: ids.length,
   });
+  // Newly-attached creatives may add formats — publish to their placements.
+  await autoPublishCampaign(campaignId, user);
   revalidatePath(`/admin/campaigns/${campaignId}`);
 }
 

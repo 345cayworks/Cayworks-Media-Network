@@ -83,7 +83,7 @@ export default async function CreativeDetailPage({
     <div>
       <PageHeader
         title={cr.title}
-        subtitle={`${cr.creativeType}${cr.width && cr.height ? ` · ${cr.width}×${cr.height}` : ""}`}
+        subtitle={`${cr.creativeType} · ${cr.format} slot${cr.width && cr.height ? ` · ${cr.width}×${cr.height}` : ""}`}
         action={
           <div className="flex flex-wrap gap-2">
             <LinkButton href={`/admin/creatives/${cr.id}/edit`} variant="secondary">

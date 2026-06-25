@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, ADMIN_ROLES, STAFF_ROLES } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { creativeSchema } from "@/lib/validation";
+import { autoPublishCampaign, autoPublishForCreative } from "@/lib/auto-publish";
 
 function parse(formData: FormData) {
   const raw = Object.fromEntries(formData);
@@ -39,6 +40,8 @@ export async function createCreative(formData: FormData) {
     await audit(user, "ATTACH", "CampaignCreative", attachTo, {
       creativeId: cr.id,
     });
+    // Self-guards on campaign ACTIVE + creative APPROVED inside.
+    await autoPublishCampaign(attachTo, user);
     revalidatePath(`/admin/campaigns/${attachTo}`);
     revalidatePath("/admin/creatives");
     redirect(`/admin/campaigns/${attachTo}`);
@@ -56,6 +59,8 @@ export async function updateCreative(id: string, formData: FormData) {
   }
   await prisma.creative.update({ where: { id }, data: parsed.data });
   await audit(user, "UPDATE", "Creative", id);
+  // Format/approval may have changed — re-publish any active campaigns using it.
+  await autoPublishForCreative(id, user);
   revalidatePath(`/admin/creatives/${id}`);
   redirect(`/admin/creatives/${id}`);
 }
@@ -82,6 +87,8 @@ export async function setApproval(
   const user = await requireRole(ADMIN_ROLES);
   await prisma.creative.update({ where: { id }, data: { approvalStatus } });
   await audit(user, `APPROVAL_${approvalStatus}`, "Creative", id);
+  // Approving makes it servable → publish the active campaigns that use it.
+  if (approvalStatus === "APPROVED") await autoPublishForCreative(id, user);
   revalidatePath(`/admin/creatives/${id}`);
   revalidatePath("/admin/creatives");
   revalidatePath("/admin/approvals");
@@ -109,6 +116,9 @@ export async function bulkSetApproval(
   await audit(user, `APPROVAL_BULK_${approvalStatus}`, "Creative", null, {
     count: ids.length,
   });
+  if (approvalStatus === "APPROVED") {
+    for (const id of ids) await autoPublishForCreative(id, user);
+  }
   revalidatePath("/admin/approvals");
   revalidatePath("/admin/creatives");
 }
@@ -133,6 +143,7 @@ export async function createAndAttachCreative(
     update: { status: "ACTIVE" },
   });
   await audit(user, "CREATE_AND_ATTACH", "Creative", cr.id, { campaignId });
+  await autoPublishCampaign(campaignId, user);
   revalidatePath(`/admin/campaigns/${campaignId}`);
   revalidatePath("/admin/creatives");
   redirect(`/admin/campaigns/${campaignId}`);
@@ -184,6 +195,7 @@ export async function bulkAttachLibrarySelectionToCampaign(formData: FormData) {
   await audit(user, "ATTACH_BULK_LIBRARY", "Campaign", targetCampaignId, {
     count: ids.length,
   });
+  await autoPublishCampaign(targetCampaignId, user);
   revalidatePath("/admin/creatives");
   revalidatePath(`/admin/campaigns/${targetCampaignId}`);
 }
@@ -203,6 +215,7 @@ export async function attachCreativeToCampaign(
     update: { status: "ACTIVE" },
   });
   await audit(user, "ATTACH", "CampaignCreative", campaignId, { creativeId });
+  await autoPublishCampaign(campaignId, user);
   revalidatePath(`/admin/campaigns/${campaignId}`);
   revalidatePath(`/admin/creatives/${creativeId}`);
 }

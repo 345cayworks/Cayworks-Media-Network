@@ -58,6 +58,19 @@ export function CreativeForm({
           options={enumOptions(["IMAGE", "VIDEO", "NATIVE", "HTML"])}
           defaultValue={creative?.creativeType}
         />
+        <Select
+          label="Slot Format (which placements it serves)"
+          name="format"
+          options={enumOptions([
+            "BANNER",
+            "CARD",
+            "NATIVE",
+            "SIDEBAR",
+            "VIDEO",
+            "SKYSCRAPER",
+          ])}
+          defaultValue={creative?.format}
+        />
         <div className="grid grid-cols-2 gap-2">
           <Field
             label="Width"

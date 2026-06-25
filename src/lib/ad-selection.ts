@@ -217,8 +217,15 @@ async function gatherCandidates(
     }
 
     const weight = Math.max(1, campaign.priority) * Math.max(1, link.weight);
-    const eligibleCreatives = campaign.creativeLinks.map((l) => l.creative);
-    const bestCreatives = filterBestCreatives(eligibleCreatives, sizes);
+    // Format match: a placement is fed only the creatives built for its slot
+    // type (card slot → card creative, native → native, etc.). Unlike size-fit
+    // this is strict — a campaign with no creative of this format contributes
+    // nothing here rather than serving a wrong-format ad.
+    const formatMatched = campaign.creativeLinks
+      .map((l) => l.creative)
+      .filter((c) => c.format === placement.placementType);
+    if (formatMatched.length === 0) continue;
+    const bestCreatives = filterBestCreatives(formatMatched, sizes);
     candidates.push({ link, weight, bestCreatives });
   }
 

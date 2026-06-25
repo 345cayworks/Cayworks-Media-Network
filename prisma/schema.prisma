@@ -62,13 +62,17 @@ enum CampaignStatus {
   ENDED
 }
 
-// Gates auto-publish: when a campaign goes ACTIVE it is auto-assigned to every
-// ACTIVE placement whose placementType matches this value (and vice-versa when
-// a placement is activated). A strict subset of PlacementType by design.
-enum CampaignType {
+// A creative's intended slot format — mirrors PlacementType so serving can
+// match a creative to a placement by exact type. A campaign is multi-format:
+// it auto-publishes to every placement type for which it has an APPROVED +
+// ACTIVE creative, and serves each placement the creative whose format fits.
+enum CreativeFormat {
   BANNER
+  SIDEBAR
   CARD
   NATIVE
+  VIDEO
+  SKYSCRAPER
 }
 
 enum PricingModel {
@@ -235,8 +239,6 @@ model Campaign {
   advertiser           Advertiser        @relation(fields: [advertiserId], references: [id], onDelete: Cascade)
   name                 String
   objective            CampaignObjective @default(TRAFFIC)
-  // Drives auto-publish to matching-type placements on activation.
-  campaignType         CampaignType      @default(BANNER)
   startDate            DateTime
   endDate              DateTime
   budget               Decimal           @default(0) @db.Decimal(12, 2)
@@ -272,6 +274,10 @@ model Creative {
   destinationUrl String
   ctaText        String?
   creativeType   CreativeType   @default(IMAGE)
+  // Which placement slot this creative is built for; matched to
+  // AdPlacement.placementType at serve time and used to derive a campaign's
+  // auto-publish targets. creativeType stays the media kind (image/video/…).
+  format         CreativeFormat @default(BANNER)
   width          Int?
   height         Int?
   approvalStatus ApprovalStatus @default(PENDING)

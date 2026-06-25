@@ -110,7 +110,7 @@ export default async function CampaignDetailPage({
     <div>
       <PageHeader
         title={c.name}
-        subtitle={`${c.advertiser.businessName} · ${c.campaignType} · ${c.pricingModel} · priority ${c.priority}`}
+        subtitle={`${c.advertiser.businessName} · ${c.pricingModel} · priority ${c.priority}`}
         action={
           <div className="flex flex-wrap gap-2">
             <LinkButton
