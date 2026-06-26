@@ -123,6 +123,45 @@ export async function bulkSetApproval(
   revalidatePath("/admin/creatives");
 }
 
+const CREATIVE_FORMATS = [
+  "BANNER",
+  "SIDEBAR",
+  "CARD",
+  "NATIVE",
+  "VIDEO",
+  "SKYSCRAPER",
+] as const;
+type CreativeFormatValue = (typeof CREATIVE_FORMATS)[number];
+
+/** Bulk-set the slot format on many creatives (the retag cleanup). Re-publishes
+ *  any active campaigns using them so coverage updates immediately. */
+export async function bulkSetCreativeFormat(formData: FormData) {
+  const user = await requireRole(STAFF_ROLES);
+  const format = String(formData.get("format") ?? "");
+  if (!CREATIVE_FORMATS.includes(format as CreativeFormatValue)) {
+    revalidatePath("/admin/creatives");
+    return;
+  }
+  const ids = formData
+    .getAll("creativeId")
+    .map((v) => String(v))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/admin/creatives");
+    return;
+  }
+  await prisma.creative.updateMany({
+    where: { id: { in: ids } },
+    data: { format: format as CreativeFormatValue },
+  });
+  await audit(user, "SET_FORMAT_BULK", "Creative", null, {
+    format,
+    count: ids.length,
+  });
+  for (const id of ids) await autoPublishForCreative(id, user);
+  revalidatePath("/admin/creatives");
+}
+
 /** Create a new creative and attach it to a campaign in one shot. Used by
  *  the drop-zone uploader on the campaign detail page. */
 export async function createAndAttachCreative(

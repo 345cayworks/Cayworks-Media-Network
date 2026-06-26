@@ -13,12 +13,21 @@ import {
   bulkSetApproval,
   setApproval,
   bulkAttachLibrarySelectionToCampaign,
+  bulkSetCreativeFormat,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const TYPE_FILTERS = ["IMAGE", "VIDEO", "NATIVE", "HTML"] as const;
 const APPROVAL_FILTERS = ["PENDING", "APPROVED", "REJECTED"] as const;
+const FORMAT_FILTERS = [
+  "BANNER",
+  "CARD",
+  "NATIVE",
+  "SIDEBAR",
+  "VIDEO",
+  "SKYSCRAPER",
+] as const;
 
 type Sort =
   | "newest"
@@ -60,6 +69,7 @@ export default async function CreativesPage({
   searchParams: {
     approval?: string;
     type?: string;
+    format?: string;
     q?: string;
     sort?: string;
     page?: string;
@@ -75,6 +85,9 @@ export default async function CreativesPage({
   }
   if (TYPE_FILTERS.includes(searchParams.type as "IMAGE")) {
     where.creativeType = searchParams.type as "IMAGE";
+  }
+  if (FORMAT_FILTERS.includes(searchParams.format as "BANNER")) {
+    where.format = searchParams.format as "BANNER";
   }
   const q = (searchParams.q ?? "").trim();
   if (q) where.title = { contains: q, mode: "insensitive" };
@@ -133,6 +146,15 @@ export default async function CreativesPage({
           preserve={searchParams}
         />
 
+        <FilterChips
+          label="Slot format"
+          name="format"
+          basePath="/admin/creatives"
+          items={FORMAT_FILTERS.map((f) => ({ value: f }))}
+          active={searchParams.format}
+          preserve={searchParams}
+        />
+
         <div className="flex flex-col">
           <span className="label">Sort</span>
           <form method="get" className="flex items-center gap-1">
@@ -142,6 +164,9 @@ export default async function CreativesPage({
             )}
             {searchParams.type && (
               <input type="hidden" name="type" value={searchParams.type} />
+            )}
+            {searchParams.format && (
+              <input type="hidden" name="format" value={searchParams.format} />
             )}
             <select
               name="sort"
@@ -224,6 +249,9 @@ export default async function CreativesPage({
                             ? ` · ${cr.width}×${cr.height}`
                             : ""}
                         </div>
+                        <div className="mt-1">
+                          <Badge value={cr.format} />
+                        </div>
                       </div>
                       <Badge value={cr.approvalStatus} />
                     </div>
@@ -289,6 +317,26 @@ export default async function CreativesPage({
                 </button>
               </>
             )}
+            <select
+              name="format"
+              defaultValue=""
+              className="input max-w-[160px] text-xs"
+              title="Set the slot format on the selected creatives"
+            >
+              <option value="">Set format…</option>
+              {FORMAT_FILTERS.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              formAction={bulkSetCreativeFormat}
+              className="btn-secondary"
+            >
+              Set format
+            </button>
             <button type="submit" className="btn-primary">
               Approve selected
             </button>

@@ -100,7 +100,16 @@ export async function diagnoseForPlatform(
       .filter((l) => l.status === "ACTIVE")
       .map((l) => l.creative)
       .filter((cr) => cr.approvalStatus === "APPROVED" && cr.status === "ACTIVE");
-    if (approved.length === 0) reasons.push("no APPROVED + ACTIVE creatives");
+    if (approved.length === 0) {
+      reasons.push("no APPROVED + ACTIVE creatives");
+    } else if (!approved.some((cr) => cr.format === placement.placementType)) {
+      // Serving is format-strict: a creative is shown only in a slot of its
+      // own format. Approved creatives exist but none fit this slot's type.
+      const have = [...new Set(approved.map((cr) => cr.format))].join(", ");
+      reasons.push(
+        `no APPROVED ${placement.placementType} creative for this slot (campaign has: ${have})`,
+      );
+    }
 
     // Per-user frequency caps (only evaluable when a user id is supplied).
     if (anonymousUserId) {

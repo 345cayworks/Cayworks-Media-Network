@@ -106,6 +106,29 @@ export default async function CampaignDetailPage({
     eligibility.map((e) => [e.placementId, e]),
   );
 
+  // Format coverage: which slot formats this campaign can actually serve
+  // (its APPROVED + ACTIVE creatives on ACTIVE links) vs. the formats of the
+  // active placements it's assigned to. Any assigned format with no matching
+  // creative will silently go dark — surface it.
+  const servedFormats = new Set(
+    c.creativeLinks
+      .filter(
+        (l) =>
+          l.status === "ACTIVE" &&
+          l.creative.approvalStatus === "APPROVED" &&
+          l.creative.status === "ACTIVE",
+      )
+      .map((l) => l.creative.format),
+  );
+  const assignedFormats = new Set(
+    c.campaignPlacements
+      .filter((cp) => cp.status === "ACTIVE")
+      .map((cp) => cp.placement.placementType),
+  );
+  const uncoveredFormats = [...assignedFormats].filter(
+    (t) => !servedFormats.has(t),
+  );
+
   return (
     <div>
       <PageHeader
@@ -218,6 +241,25 @@ export default async function CampaignDetailPage({
           Upload new creative
         </LinkButton>
       </div>
+      <div className="mt-2 text-xs text-slate-500">
+        Serves formats:{" "}
+        <span className="font-medium text-slate-700">
+          {servedFormats.size ? [...servedFormats].join(", ") : "none yet"}
+        </span>
+        {assignedFormats.size > 0 && (
+          <>
+            {" · assigned slots: "}
+            <span className="font-medium text-slate-700">
+              {[...assignedFormats].join(", ")}
+            </span>
+          </>
+        )}
+        {uncoveredFormats.length > 0 && (
+          <span className="ml-1 rounded bg-rose-100 px-1.5 py-0.5 font-medium text-rose-700">
+            ⚠ no creative for {uncoveredFormats.join(", ")} — those slots stay dark
+          </span>
+        )}
+      </div>
       <div className="card mt-2 overflow-x-auto">
         {c.creativeLinks.length === 0 ? (
           <div className="p-4">
@@ -233,6 +275,7 @@ export default async function CampaignDetailPage({
                 <th className="th w-8"></th>
                 <th className="th">Title</th>
                 <th className="th">Type</th>
+                <th className="th">Format</th>
                 <th className="th">Approval</th>
                 <th className="th">Link</th>
                 <th className="th"></th>
@@ -261,6 +304,9 @@ export default async function CampaignDetailPage({
                     </Link>
                   </td>
                   <td className="td">{cr.creativeType}</td>
+                  <td className="td">
+                    <Badge value={cr.format} />
+                  </td>
                   <td className="td">
                     <Badge value={cr.approvalStatus} />
                   </td>
@@ -402,6 +448,7 @@ export default async function CampaignDetailPage({
                 <th className="th w-8"></th>
                 <th className="th">Placement</th>
                 <th className="th">Platform</th>
+                <th className="th">Type</th>
                 <th className="th">Weight</th>
                 <th className="th">Status</th>
                 <th className="th"></th>
@@ -428,6 +475,19 @@ export default async function CampaignDetailPage({
                     </div>
                   </td>
                   <td className="td">{cp.placement.platform.name}</td>
+                  <td className="td">
+                    <span className="inline-flex items-center gap-1">
+                      <Badge value={cp.placement.placementType} />
+                      {!servedFormats.has(cp.placement.placementType) && (
+                        <span
+                          className="text-rose-600"
+                          title="No matching-format creative — this slot will not serve"
+                        >
+                          ⚠
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="td">{cp.weight}</td>
                   <td className="td">
                     <div className="flex flex-col gap-1">
