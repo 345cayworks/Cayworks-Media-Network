@@ -88,13 +88,13 @@ export default async function ApprovalsPage({
                     />
                     Select for bulk action
                   </label>
-                  <div className="aspect-video w-full bg-slate-100">
+                  <div className="aspect-video w-full bg-slate-100 p-2">
                     {cr.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={cr.imageUrl}
                         alt={cr.title}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
