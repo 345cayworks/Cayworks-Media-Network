@@ -31,8 +31,14 @@ export default async function ReportingPage({
   const range: DateRange = {};
   if (searchParams.from && !Number.isNaN(Date.parse(searchParams.from)))
     range.from = new Date(searchParams.from);
-  if (searchParams.to && !Number.isNaN(Date.parse(searchParams.to)))
-    range.to = new Date(searchParams.to);
+  if (searchParams.to && !Number.isNaN(Date.parse(searchParams.to))) {
+    // `to` as YYYY-MM-DD parses to 00:00 UTC. Roll forward to end-of-day
+    // so the range is inclusive — otherwise "today" and "last 7d" lose
+    // everything that happened after midnight UTC on the end day.
+    const end = new Date(searchParams.to);
+    end.setUTCHours(23, 59, 59, 999);
+    range.to = end;
+  }
 
   const rows = await buildReport(dim, range);
 

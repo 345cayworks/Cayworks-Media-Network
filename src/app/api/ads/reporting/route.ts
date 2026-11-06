@@ -27,7 +27,13 @@ export async function GET(req: Request) {
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
   if (from && !Number.isNaN(Date.parse(from))) range.from = new Date(from);
-  if (to && !Number.isNaN(Date.parse(to))) range.to = new Date(to);
+  if (to && !Number.isNaN(Date.parse(to))) {
+    // `to=YYYY-MM-DD` parses to 00:00 UTC; roll forward to end-of-day so
+    // the range is inclusive (matches the admin reporting page).
+    const end = new Date(to);
+    end.setUTCHours(23, 59, 59, 999);
+    range.to = end;
+  }
 
   const rows = await buildReport(dim, range);
 
