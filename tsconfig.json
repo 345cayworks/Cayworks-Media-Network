@@ -38,6 +38,7 @@
     ".cloudflare/types"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/lib/runtime-env.cloudflare.ts"
   ]
 }
