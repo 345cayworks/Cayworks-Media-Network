@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import type { DeviceType } from "@prisma/client";
+import { getEnv } from "@/lib/runtime-env";
 
 export function detectDevice(userAgent: string | null): DeviceType {
   const ua = (userAgent ?? "").toLowerCase();
@@ -13,7 +14,7 @@ export function detectDevice(userAgent: string | null): DeviceType {
 /** One-way hash of the client IP so raw addresses are never persisted. */
 export function hashIp(ip: string | null): string | null {
   if (!ip) return null;
-  const salt = process.env.AUTH_SECRET ?? "cae";
+  const salt = getEnv("AUTH_SECRET") ?? "cae";
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
 }
 

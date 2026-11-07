@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { getEnv } from "@/lib/runtime-env";
 
 const COOKIE_NAME = "cae_session";
 
 async function valid(token: string | undefined): Promise<boolean> {
   if (!token) return false;
-  const s = process.env.AUTH_SECRET;
+  const s = getEnv("AUTH_SECRET");
   if (!s) return false;
   try {
     await jwtVerify(token, new TextEncoder().encode(s));

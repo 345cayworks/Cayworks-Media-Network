@@ -1,12 +1,13 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { getEnv } from "@/lib/runtime-env";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
 function createClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = getEnv("DATABASE_URL");
   if (!connectionString) {
     throw new Error(
       "DATABASE_URL is missing. Set it in .env locally, or as a Worker secret / Netlify env var.",

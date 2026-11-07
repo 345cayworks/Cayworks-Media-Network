@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getEnv } from "@/lib/runtime-env";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,11 +11,11 @@ export const runtime = "nodejs";
  * without server-log access. Safe to leave enabled.
  */
 export async function GET() {
-  const secret = process.env.AUTH_SECRET ?? "";
+  const secret = getEnv("AUTH_SECRET") ?? "";
   const checks = {
     AUTH_SECRET_set: secret.length > 0,
     AUTH_SECRET_long_enough: secret.length >= 16,
-    DATABASE_URL_set: !!process.env.DATABASE_URL,
+    DATABASE_URL_set: !!getEnv("DATABASE_URL"),
     database_reachable: false as boolean | string,
     superadmin_exists: false as boolean | string,
   };

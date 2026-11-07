@@ -5,12 +5,13 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getEnv } from "@/lib/runtime-env";
 
 const COOKIE_NAME = "cae_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12h
 
 function secret(): Uint8Array {
-  const value = process.env.AUTH_SECRET;
+  const value = getEnv("AUTH_SECRET");
   if (!value || value.length < 16) {
     throw new Error(
       "AUTH_SECRET is missing or too short. Set a long random string in .env",

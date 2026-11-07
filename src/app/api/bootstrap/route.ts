@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getEnv } from "@/lib/runtime-env";
 import { runSeed } from "@/lib/seed-core";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +14,8 @@ export const maxDuration = 60;
  * never regenerated. Tables must already exist (migrations run on deploy).
  */
 async function handle(req: Request) {
-  const master = process.env.SUPERADMIN_MASTER_KEY ?? "";
-  const email = process.env.SUPER_ADMIN_EMAIL ?? "admin@cayworks.example";
+  const master = getEnv("SUPERADMIN_MASTER_KEY") ?? "";
+  const email = getEnv("SUPER_ADMIN_EMAIL") ?? "admin@cayworks.example";
 
   if (master.length < 8) {
     return NextResponse.json(

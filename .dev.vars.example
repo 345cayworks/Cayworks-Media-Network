@@ -1,0 +1,11 @@
+# Local Cloudflare Workers secrets. Copy to `.dev.vars` (gitignored) and fill in.
+#
+# These are read by `npm run dev:vinext` only. Note that `npm run start:vinext`
+# (vite preview) does NOT load this file, so /api/health will report the vars as
+# unset there even when they are configured correctly.
+#
+# In production these are Worker secrets, not this file — see
+# docs/CLOUDFLARE_DEPLOY.md.
+
+DATABASE_URL="postgresql://user:password@ep-xxx.neon.tech/dbname?sslmode=require"
+AUTH_SECRET="generate-with-openssl-rand-base64-48"

@@ -12,3 +12,6 @@ prisma/*.db
 prisma/*.db-journal
 next-env.d.ts
 tsconfig.tsbuildinfo
+.vinext/
+.cloudflare/
+.dev.vars
