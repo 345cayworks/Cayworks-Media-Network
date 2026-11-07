@@ -7,13 +7,14 @@ import { updateCreative } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditCreativePage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { error?: string };
-}) {
+export default async function EditCreativePage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireRole(STAFF_ROLES);
   const creative = await prisma.creative.findUnique({ where: { id: params.id } });
   if (!creative) notFound();

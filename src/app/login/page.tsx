@@ -2,11 +2,12 @@ import { loginAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default function LoginPage({
-  searchParams,
-}: {
-  searchParams: { error?: string; next?: string };
-}) {
+export default async function LoginPage(
+  props: {
+    searchParams: Promise<{ error?: string; next?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
       <div className="card w-full max-w-sm p-6">

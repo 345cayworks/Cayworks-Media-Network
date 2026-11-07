@@ -28,7 +28,7 @@ export async function createPlatform(formData: FormData) {
     },
   });
   await audit(user, "CREATE", "Platform", p.id, { slug: p.slug });
-  stashKey(p.id, key.raw);
+  await stashKey(p.id, key.raw);
   revalidatePath("/admin/platforms");
   redirect(`/admin/platforms/${p.id}`);
 }
@@ -61,7 +61,7 @@ export async function regenerateApiKey(id: string) {
     data: { apiKeyHash: key.hash, apiKeyPrefix: key.prefix },
   });
   await audit(user, "REGENERATE_API_KEY", "Platform", id);
-  stashKey(id, key.raw);
+  await stashKey(id, key.raw);
   revalidatePath(`/admin/platforms/${id}`);
   redirect(`/admin/platforms/${id}`);
 }

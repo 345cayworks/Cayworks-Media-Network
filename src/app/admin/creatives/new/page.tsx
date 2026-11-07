@@ -11,11 +11,12 @@ export const dynamic = "force-dynamic";
  * with ?attachTo=<campaignId>, the new creative is automatically linked to
  * that campaign on save.
  */
-export default async function NewCreativePage({
-  searchParams,
-}: {
-  searchParams: { attachTo?: string; error?: string };
-}) {
+export default async function NewCreativePage(
+  props: {
+    searchParams: Promise<{ attachTo?: string; error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole(STAFF_ROLES);
   const attachTo = searchParams.attachTo;
   const target = attachTo

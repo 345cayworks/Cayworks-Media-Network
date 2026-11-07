@@ -7,13 +7,14 @@ import { updateCampaign } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditCampaignPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { error?: string };
-}) {
+export default async function EditCampaignPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireRole(STAFF_ROLES);
   const [campaign, advertisers] = await Promise.all([
     prisma.campaign.findUnique({ where: { id: params.id } }),

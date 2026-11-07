@@ -63,20 +63,21 @@ function orderForSort(s: Sort): Prisma.CreativeOrderByWithRelationInput {
   }
 }
 
-export default async function CreativesPage({
-  searchParams,
-}: {
-  searchParams: {
-    approval?: string;
-    type?: string;
-    format?: string;
-    q?: string;
-    sort?: string;
-    page?: string;
-    pageSize?: string;
-    orphan?: string;
-  };
-}) {
+export default async function CreativesPage(
+  props: {
+    searchParams: Promise<{
+      approval?: string;
+      type?: string;
+      format?: string;
+      q?: string;
+      sort?: string;
+      page?: string;
+      pageSize?: string;
+      orphan?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireUser();
 
   const where: Prisma.CreativeWhereInput = {};

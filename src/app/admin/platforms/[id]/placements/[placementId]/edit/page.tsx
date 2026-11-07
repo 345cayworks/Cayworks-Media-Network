@@ -8,13 +8,14 @@ import { updatePlacement } from "@/app/admin/platforms/actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditPlacementPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string; placementId: string };
-  searchParams: { error?: string };
-}) {
+export default async function EditPlacementPage(
+  props: {
+    params: Promise<{ id: string; placementId: string }>;
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireRole(ADMIN_ROLES);
   const placement = await prisma.adPlacement.findUnique({
     where: { id: params.placementId },

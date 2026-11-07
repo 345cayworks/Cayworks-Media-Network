@@ -5,11 +5,12 @@ import { createPlatform } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewPlatformPage({
-  searchParams,
-}: {
-  searchParams: { error?: string };
-}) {
+export default async function NewPlatformPage(
+  props: {
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole(ADMIN_ROLES);
   return (
     <div>

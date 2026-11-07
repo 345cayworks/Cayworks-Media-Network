@@ -6,11 +6,12 @@ import { createCampaign } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewCampaignPage({
-  searchParams,
-}: {
-  searchParams: { error?: string; advertiserId?: string };
-}) {
+export default async function NewCampaignPage(
+  props: {
+    searchParams: Promise<{ error?: string; advertiserId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole(STAFF_ROLES);
   const advertisers = await prisma.advertiser.findMany({
     where: { status: "ACTIVE" },

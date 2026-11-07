@@ -8,8 +8,8 @@ const KEY_COOKIE = "cae_new_key";
 const TTL_SECONDS = 120;
 
 /** Stash a freshly generated raw API key for a brief one-time reveal. */
-export function stashKey(platformId: string, raw: string): void {
-  cookies().set(`${KEY_COOKIE}_${platformId}`, raw, {
+export async function stashKey(platformId: string, raw: string): Promise<void> {
+  (await cookies()).set(`${KEY_COOKIE}_${platformId}`, raw, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -18,6 +18,8 @@ export function stashKey(platformId: string, raw: string): void {
 }
 
 /** Read the stashed raw key (read-only; safe to call during render). */
-export function readNewKey(platformId: string): string | null {
-  return cookies().get(`${KEY_COOKIE}_${platformId}`)?.value ?? null;
+export async function readNewKey(platformId: string): Promise<string | null> {
+  return (
+    (await cookies()).get(`${KEY_COOKIE}_${platformId}`)?.value ?? null
+  );
 }

@@ -23,7 +23,7 @@ export default async function TestDeliveryPage() {
 
   // Derive the engine origin so the harness exercises the public API exactly
   // the way a host app would (going out and back through the network).
-  const h = headers();
+  const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto =
     h.get("x-forwarded-proto") ??

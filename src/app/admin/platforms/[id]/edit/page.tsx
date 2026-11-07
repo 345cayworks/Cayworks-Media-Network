@@ -7,13 +7,14 @@ import { updatePlatform } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditPlatformPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { error?: string };
-}) {
+export default async function EditPlatformPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireRole(ADMIN_ROLES);
   const platform = await prisma.platform.findUnique({
     where: { id: params.id },

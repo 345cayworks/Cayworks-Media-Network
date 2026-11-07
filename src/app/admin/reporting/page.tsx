@@ -13,16 +13,17 @@ const TABS = [
   { key: "placement", label: "By Placement" },
 ] as const;
 
-export default async function ReportingPage({
-  searchParams,
-}: {
-  searchParams: {
-    groupBy?: string;
-    from?: string;
-    to?: string;
-    metric?: string;
-  };
-}) {
+export default async function ReportingPage(
+  props: {
+    searchParams: Promise<{
+      groupBy?: string;
+      from?: string;
+      to?: string;
+      metric?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole(REPORT_ROLES);
 
   const dim = (TABS.find((t) => t.key === searchParams.groupBy)?.key ??

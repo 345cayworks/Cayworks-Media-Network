@@ -51,7 +51,7 @@ export async function createSession(user: SessionUser): Promise<void> {
     .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
     .sign(secret());
 
-  cookies().set(COOKIE_NAME, token, {
+  (await cookies()).set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -60,12 +60,12 @@ export async function createSession(user: SessionUser): Promise<void> {
   });
 }
 
-export function destroySession(): void {
-  cookies().set(COOKIE_NAME, "", { path: "/", maxAge: 0 });
+export async function destroySession(): Promise<void> {
+  (await cookies()).set(COOKIE_NAME, "", { path: "/", maxAge: 0 });
 }
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const token = cookies().get(COOKIE_NAME)?.value;
+  const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
@@ -81,7 +81,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   }
 }
 
-/** Verify edge/middleware token without touching the DB. */
+/** Verify a proxy-issued session token without touching the DB. */
 export async function verifyToken(token: string): Promise<boolean> {
   try {
     await jwtVerify(token, secret());

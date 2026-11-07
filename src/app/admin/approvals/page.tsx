@@ -12,11 +12,12 @@ export const dynamic = "force-dynamic";
 const TYPES = ["IMAGE", "VIDEO", "NATIVE", "HTML"] as const;
 
 /** Central inbox of every PENDING creative across the network. */
-export default async function ApprovalsPage({
-  searchParams,
-}: {
-  searchParams: { type?: string };
-}) {
+export default async function ApprovalsPage(
+  props: {
+    searchParams: Promise<{ type?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole(ADMIN_ROLES);
 
   const where: Prisma.CreativeWhereInput = { approvalStatus: "PENDING" };

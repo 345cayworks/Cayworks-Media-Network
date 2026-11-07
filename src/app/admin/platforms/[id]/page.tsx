@@ -15,11 +15,12 @@ import { Field, TextArea, Select, enumOptions } from "@/components/form";
 
 export const dynamic = "force-dynamic";
 
-export default async function PlatformDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function PlatformDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   await requireRole(ADMIN_ROLES);
   const p = await prisma.platform.findUnique({
     where: { id: params.id },
@@ -27,7 +28,7 @@ export default async function PlatformDetailPage({
   });
   if (!p) notFound();
 
-  const newKey = readNewKey(p.id);
+  const newKey = await readNewKey(p.id);
   const base =
     process.env.NEXT_PUBLIC_AD_ENGINE_URL ?? "http://localhost:3000";
 
