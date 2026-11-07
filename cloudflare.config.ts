@@ -4,7 +4,9 @@ export default defineConfig({
   // Info@cayworks.com's Account. Not a secret; keeps deploys deterministic in CI.
   accountId: "bc26de2ac00c37461d2d9fe80e29f6ef",
   worker: defineWorker({
-    name: "cayworks-ad-engine",
+    // Must match the Worker that the repo's Workers Builds integration
+    // targets, which is "cayworks-media-network" (not the package name).
+    name: "cayworks-media-network",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-11-07",
     compatibilityFlags: ["nodejs_compat"],

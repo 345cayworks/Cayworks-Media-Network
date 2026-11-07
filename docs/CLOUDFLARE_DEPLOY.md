@@ -58,6 +58,30 @@ npx cf secret put AUTH_SECRET
 Add `SUPERADMIN_MASTER_KEY` and `SUPER_ADMIN_EMAIL` the same way if you intend
 to use `/api/bootstrap`, and uncomment them in `cloudflare.config.ts`.
 
+## Worker name and the Workers Builds check
+
+The Worker is named `cayworks-media-network` in `cloudflare.config.ts`. That
+name is deliberately *not* the package name (`cayworks-ad-engine`): this
+GitHub repo has a Cloudflare **Workers Builds** integration attached from the
+earlier next-on-pages experiment, and it targets a Worker service called
+`cayworks-media-network`. The names have to agree or its PR check fails.
+
+That check reports
+
+    Preview creation failed: This Worker does not exist on your account.
+
+until the Worker service actually exists. Matching the name is necessary but
+not sufficient; to get the check green you also need to:
+
+1. Run `npm run deploy:vinext` once, to create the Worker service.
+2. In the Cloudflare dashboard, point the Workers Builds configuration at the
+   vinext commands - build `npm run build:vinext`, deploy
+   `npx @vinext/cloudflare deploy` - since it was set up for next-on-pages.
+
+If you would rather not have CI deploying to Cloudflare while Netlify is
+production, disconnect the Workers Builds integration in the dashboard and
+deploy manually with `npm run deploy:vinext`. The check disappears with it.
+
 ## Commands
 
 ```bash
