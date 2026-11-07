@@ -40,21 +40,22 @@ const ENTITIES = [
   "User",
 ] as const;
 
-export default async function AuditPage({
-  searchParams,
-}: {
-  searchParams: {
-    entity?: string;
-    q?: string;
-    actor?: string;
-    from?: string;
-    to?: string;
-    page?: string;
-    pageSize?: string;
-    sort?: string;
-    dir?: string;
-  };
-}) {
+export default async function AuditPage(
+  props: {
+    searchParams: Promise<{
+      entity?: string;
+      q?: string;
+      actor?: string;
+      from?: string;
+      to?: string;
+      page?: string;
+      pageSize?: string;
+      sort?: string;
+      dir?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole(ADMIN_ROLES);
 
   const where: Prisma.AuditLogWhereInput = {};

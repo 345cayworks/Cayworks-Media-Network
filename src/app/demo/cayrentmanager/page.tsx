@@ -7,11 +7,12 @@ export const dynamic = "force-dynamic";
  * Provide the platform API key via ?key=... (demo only — never put real
  * keys in client URLs in production; inject them server-side instead).
  */
-export default function DemoPage({
-  searchParams,
-}: {
-  searchParams: { key?: string };
-}) {
+export default async function DemoPage(
+  props: {
+    searchParams: Promise<{ key?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const engineUrl =
     process.env.NEXT_PUBLIC_AD_ENGINE_URL ?? "http://localhost:3000";
   const apiKey = searchParams.key ?? "";

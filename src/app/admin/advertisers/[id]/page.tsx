@@ -8,11 +8,12 @@ import { DeleteButton } from "@/components/DeleteButton";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdvertiserDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function AdvertiserDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   await requireUser();
   const a = await prisma.advertiser.findUnique({
     where: { id: params.id },

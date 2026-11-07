@@ -54,17 +54,18 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.AdvertiserOrderByWithRelati
 
 // SortHeader / SortHeaderInline live in @/components/SortHeader now.
 
-export default async function AdvertisersPage({
-  searchParams,
-}: {
-  searchParams: {
-    sort?: string;
-    dir?: string;
-    q?: string;
-    page?: string;
-    pageSize?: string;
-  };
-}) {
+export default async function AdvertisersPage(
+  props: {
+    searchParams: Promise<{
+      sort?: string;
+      dir?: string;
+      q?: string;
+      page?: string;
+      pageSize?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireUser();
 
   const sort: SortKey = SORTABLE.has(searchParams.sort as SortKey)

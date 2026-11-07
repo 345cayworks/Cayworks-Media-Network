@@ -7,13 +7,14 @@ import { updateAdvertiser } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditAdvertiserPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { error?: string };
-}) {
+export default async function EditAdvertiserPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireRole(ADMIN_ROLES);
   const advertiser = await prisma.advertiser.findUnique({
     where: { id: params.id },

@@ -5,11 +5,12 @@ import { createAdvertiser } from "../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewAdvertiserPage({
-  searchParams,
-}: {
-  searchParams: { error?: string; return?: string };
-}) {
+export default async function NewAdvertiserPage(
+  props: {
+    searchParams: Promise<{ error?: string; return?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireRole(ADMIN_ROLES);
   const action = async (formData: FormData) => {
     "use server";

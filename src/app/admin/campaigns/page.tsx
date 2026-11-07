@@ -60,18 +60,19 @@ function orderByFor(sort: SortKey, dir: Dir): Prisma.CampaignOrderByWithRelation
   }
 }
 
-export default async function CampaignsPage({
-  searchParams,
-}: {
-  searchParams: {
-    sort?: string;
-    dir?: string;
-    state?: string;
-    q?: string;
-    page?: string;
-    pageSize?: string;
-  };
-}) {
+export default async function CampaignsPage(
+  props: {
+    searchParams: Promise<{
+      sort?: string;
+      dir?: string;
+      state?: string;
+      q?: string;
+      page?: string;
+      pageSize?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireUser();
 
   const sort: SortKey = SORTABLE.has(searchParams.sort as SortKey)
